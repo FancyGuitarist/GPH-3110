@@ -101,7 +101,7 @@ class MainWindow(tk.Frame):
         self.wavelength_txt_box = ctk.CTkTextbox(self, width=200, height=20, corner_radius=10, font=self.text_font)
         self.wavelength_txt_box_label = ctk.CTkLabel(self, text="Wavelength (nm)", font=self.label_font)
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
-        self.power_txt_box_label.place(x=325, y=12)
+        self.power_txt_box_label.place(x=335, y=12)
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
         self.wavelength_txt_box_label.place(x=300, y=135)
         threading.Thread(target=self.update_values).start()
@@ -135,5 +135,5 @@ class OtherWindow(tk.Frame):
 
 if __name__ == '__main__':
     app = PowerMeterUI()
-    app.title("Power Meter Interface")
+    app.title("Power Meter Interface v.0.1.0")
     app.mainloop()
