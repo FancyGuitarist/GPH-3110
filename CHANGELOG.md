@@ -1,4 +1,11 @@
-## 0.1.0 (2025-01-19)
+## [0.1.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.1.0...v0.1.1) (2025-01-19)
+
+
+### Bug Fixes
+
+* Addded tk_files for app build ([e09c88f](https://github.com/FancyGuitarist/GPH-3110/commit/e09c88f2f155d9a2f9c76d24cadd7babf760f2fa))
+
+## [0.1.0](https://github.com/FancyGuitarist/GPH-3110/compare/d9e4e6d341624660af3ca591dc952ad79c51f7ad...v0.1.0) (2025-01-19)
 
 
 ### Features
