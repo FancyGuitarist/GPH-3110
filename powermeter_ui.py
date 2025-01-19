@@ -1,5 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
+import numpy as np
 import time
 import threading
 
@@ -15,6 +16,30 @@ def setup_grid(self, rows: int, cols: int):
 
 
 tk.Frame.setup_grid = setup_grid
+
+
+def update_text_box(self, text, center=True):
+    """
+    Updates the text box with the given text.
+    """
+    self.configure(state="normal")
+    self.delete("0.0", tk.END)
+    if center:
+        text = ' ' * 20 + text
+    self.insert("0.0", text)
+    self.configure(state="disabled")
+
+
+ctk.CTkTextbox.update_text_box = update_text_box
+
+
+def random_ui_values():
+    """
+    Generates random values for the UI.
+    """
+    power = np.random.randint(0, 1000) / 100
+    wavelength = np.random.randint(250, 2500)
+    return power, wavelength
 
 
 class PowerMeterUI(tk.Tk):
@@ -71,20 +96,30 @@ class MainWindow(tk.Frame):
         self.setup_grid(6, 3)
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
-
-        self.power_txt_box = ctk.CTkTextbox(self, width=150, height=10, corner_radius=10, font=self.text_font)
+        self.power_txt_box = ctk.CTkTextbox(self, width=200, height=20, corner_radius=10, font=self.text_font)
         self.power_txt_box_label = ctk.CTkLabel(self, text="Power (W)", font=self.label_font)
-        self.wavelength_txt_box = ctk.CTkTextbox(self, width=150, height=10, corner_radius=10, font=self.text_font)
+        self.wavelength_txt_box = ctk.CTkTextbox(self, width=200, height=20, corner_radius=10, font=self.text_font)
         self.wavelength_txt_box_label = ctk.CTkLabel(self, text="Wavelength (nm)", font=self.label_font)
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
         self.power_txt_box_label.place(x=325, y=12)
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
         self.wavelength_txt_box_label.place(x=300, y=135)
-        # centered_text = center_text("Hello World!", 30)
-        # print(centered_text)
-        centered_text = "Hello World!"
-        self.power_txt_box.insert("0.0", centered_text)
-        self.wavelength_txt_box.insert("0.0", centered_text)
+        threading.Thread(target=self.update_values).start()
+
+    def update_values(self, random=True):
+        """
+        Updates the power and wavelength values in the UI at a frequency of 30 Hz.
+        """
+        interval = 1/15
+        while True:
+            if random:
+                power, wavelength = random_ui_values()
+            else:
+                """ Will read values from DAQ in future update """
+                power, wavelength = 0, 0
+            self.power_txt_box.update_text_box(f"{power}")
+            self.wavelength_txt_box.update_text_box(f"{wavelength}")
+            time.sleep(interval)
 
 
 class OtherWindow(tk.Frame):
@@ -96,15 +131,6 @@ class OtherWindow(tk.Frame):
         super().__init__(master)
         self.master = master
         self.controller = controller
-
-
-def center_text(text, width):
-    lines = text.split('\n')
-    centered_lines = []
-    for line in lines:
-        spaces = (width - len(line)) // 2
-        centered_lines.append(' ' * spaces + line)
-    return '\n'.join(centered_lines)
 
 
 if __name__ == '__main__':
