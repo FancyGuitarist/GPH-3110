@@ -1,3 +1,10 @@
+## [0.1.3](https://github.com/FancyGuitarist/GPH-3110/compare/v0.1.2...v0.1.3) (2025-01-19)
+
+
+### Bug Fixes
+
+* setuptools needs to be v.70.3.0 ([e33a052](https://github.com/FancyGuitarist/GPH-3110/commit/e33a052d220c314f6c3525b35b1cde2c345ae44e))
+
 ## [0.1.2](https://github.com/FancyGuitarist/GPH-3110/compare/v0.1.1...v0.1.2) (2025-01-19)
 
 
