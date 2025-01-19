@@ -1,3 +1,10 @@
+## [0.1.2](https://github.com/FancyGuitarist/GPH-3110/compare/v0.1.1...v0.1.2) (2025-01-19)
+
+
+### Bug Fixes
+
+* added setup.py file for app building ([d115391](https://github.com/FancyGuitarist/GPH-3110/commit/d115391ca5907148b12b8748554348e1e360114f))
+
 ## [0.1.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.1.0...v0.1.1) (2025-01-19)
 
 
