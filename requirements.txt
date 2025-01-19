@@ -13,4 +13,5 @@ pyparsing==3.2.1
 python-dateutil==2.9.0.post0
 scipy==1.15.1
 six==1.17.0
+setuptools==70.3.0
 tkmacosx==1.0.5

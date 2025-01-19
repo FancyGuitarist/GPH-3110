@@ -6,7 +6,6 @@ OPTIONS = {
     "argv_emulation": False,
     "packages": ["numpy", "tkinter"],
     "includes": ["numpy", "tkinter"],
-    "excludes": ["Carbon"],
     "iconfile": "app_logo.icns",
     "plist": {
         "CFBundleName": "PowerMeterApp",
