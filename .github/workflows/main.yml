@@ -47,7 +47,9 @@ jobs:
         sed -i "" "s/v\.[0-9]*\.[0-9]*\.[0-9]*/${{ steps.changelog.outputs.tag }}/" powermeter_ui.py
 
     - name: Run ruff to format code
-      run: ruff format
+      run: |
+        source venv/bin/activate
+        ruff format
 
     - name: Commit and push changes
       run: |
