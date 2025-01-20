@@ -25,7 +25,7 @@ def update_text_box(self, text, center=True):
     self.configure(state="normal")
     self.delete("0.0", tk.END)
     if center:
-        text = ' ' * 20 + text
+        text = " " * 20 + text
     self.insert("0.0", text)
     self.configure(state="disabled")
 
@@ -46,7 +46,10 @@ class PowerMeterUI(tk.Tk):
     def __init__(self, *args, **kwargs):
         # Initializing the Tkinter window that will hold the app
         tk.Tk.__init__(self, *args, **kwargs)
-        self.system_width, self.system_height = self.winfo_screenwidth(), self.winfo_screenheight() - 70
+        self.system_width, self.system_height = (
+            self.winfo_screenwidth(),
+            self.winfo_screenheight() - 70,
+        )
         self.screen_dims = (self.system_width, self.system_height)
         self.geometry(f"{self.system_width}x{self.system_height}")
         self.minsize(self.system_width, self.system_height)
@@ -96,10 +99,18 @@ class MainWindow(tk.Frame):
         self.setup_grid(6, 3)
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
-        self.power_txt_box = ctk.CTkTextbox(self, width=200, height=20, corner_radius=10, font=self.text_font)
-        self.power_txt_box_label = ctk.CTkLabel(self, text="Power (W)", font=self.label_font)
-        self.wavelength_txt_box = ctk.CTkTextbox(self, width=200, height=20, corner_radius=10, font=self.text_font)
-        self.wavelength_txt_box_label = ctk.CTkLabel(self, text="Wavelength (nm)", font=self.label_font)
+        self.power_txt_box = ctk.CTkTextbox(
+            self, width=200, height=20, corner_radius=10, font=self.text_font
+        )
+        self.power_txt_box_label = ctk.CTkLabel(
+            self, text="Power (W)", font=self.label_font
+        )
+        self.wavelength_txt_box = ctk.CTkTextbox(
+            self, width=200, height=20, corner_radius=10, font=self.text_font
+        )
+        self.wavelength_txt_box_label = ctk.CTkLabel(
+            self, text="Wavelength (nm)", font=self.label_font
+        )
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
         self.power_txt_box_label.place(x=335, y=12)
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
@@ -110,7 +121,7 @@ class MainWindow(tk.Frame):
         """
         Updates the power and wavelength values in the UI at a frequency of 30 Hz.
         """
-        interval = 1/15
+        interval = 1 / 15
         while True:
             if random:
                 power, wavelength = random_ui_values()
@@ -133,7 +144,7 @@ class OtherWindow(tk.Frame):
         self.controller = controller
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = PowerMeterUI()
     app.title("Power Meter Interface v.0.1.0")
     app.mainloop()

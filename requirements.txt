@@ -15,3 +15,4 @@ scipy==1.15.1
 six==1.17.0
 setuptools==70.3.0
 tkmacosx==1.0.5
+ruff==0.9.2
