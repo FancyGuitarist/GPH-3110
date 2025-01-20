@@ -1,3 +1,10 @@
+## [0.3.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.2.4...v0.3.0) (2025-01-20)
+
+
+### Features
+
+* DAQ implementation begins ([a06a532](https://github.com/FancyGuitarist/GPH-3110/commit/a06a532079bb3a9d169a954706841187fcf2ce61))
+
 ## [0.2.4](https://github.com/FancyGuitarist/GPH-3110/compare/v0.2.3...v0.2.4) (2025-01-20)
 
 ## [0.2.3](https://github.com/FancyGuitarist/GPH-3110/compare/v0.2.2...v0.2.3) (2025-01-20)
