@@ -1,3 +1,10 @@
+## [0.2.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.1.3...v0.2.0) (2025-01-20)
+
+
+### Features
+
+* Automatic Ruff formatting with Pipeline ([3452e09](https://github.com/FancyGuitarist/GPH-3110/commit/3452e09caaa498acecf8e7868003adf1c15456e2))
+
 ## [0.1.3](https://github.com/FancyGuitarist/GPH-3110/compare/v0.1.2...v0.1.3) (2025-01-19)
 
 
