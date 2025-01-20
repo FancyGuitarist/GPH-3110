@@ -96,6 +96,7 @@ class MainWindow(tk.Frame):
         super().__init__(master)
         self.master = master
         self.controller = controller
+        self.configure(bg="black")
         self.setup_grid(6, 3)
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)

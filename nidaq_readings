@@ -1,0 +1,10 @@
+import nidaqmx as daq
+
+
+with daq.Task() as task:
+    task.ai_channels.add_ai_voltage_chan("Daddy/ai0")
+    task.timing.cfg_samp_clk_timing(5000)
+    data = task.read(number_of_samples_per_channel=1000)
+    print(data)
+    print(len(data))
+    print(type(data))
