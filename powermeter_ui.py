@@ -146,5 +146,5 @@ class OtherWindow(tk.Frame):
 
 if __name__ == "__main__":
     app = PowerMeterUI()
-    app.title("Power Meter Interface v.0.1.0")
+    app.title("Power Meter Interface v0.2.2")
     app.mainloop()
