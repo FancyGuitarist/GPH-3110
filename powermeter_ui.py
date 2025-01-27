@@ -3,6 +3,7 @@ import customtkinter as ctk
 import numpy as np
 import time
 import threading
+from enum import StrEnum
 
 
 def setup_grid(self, rows: int, cols: int):
@@ -37,9 +38,16 @@ def random_ui_values():
     """
     Generates random values for the UI.
     """
-    power = np.random.randint(0, 1000) / 100
-    wavelength = np.random.randint(250, 2500)
+    power = np.random.randint(900, 1000) / 100
+    wavelength = np.random.randint(900, 1000)
     return power, wavelength
+
+
+class UIColors(StrEnum):
+    White = "#F0EFEF"
+    LightGray = "#B6B5B5"
+    DarkGray = "#3D3F41"
+    Black = "#202020"
 
 
 class PowerMeterUI(tk.Tk):
@@ -96,21 +104,21 @@ class MainWindow(tk.Frame):
         super().__init__(master)
         self.master = master
         self.controller = controller
-        self.configure(bg="black")
+        self.configure(bg=UIColors.White)
         self.setup_grid(6, 3)
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
         self.power_txt_box = ctk.CTkTextbox(
-            self, width=200, height=20, corner_radius=10, font=self.text_font
+            self, width=200, height=20, corner_radius=10, font=self.text_font, bg_color=UIColors.White, fg_color=UIColors.LightGray, text_color=UIColors.Black
         )
         self.power_txt_box_label = ctk.CTkLabel(
-            self, text="Power (W)", font=self.label_font
+            self, text="Power (W)", font=self.label_font, text_color=UIColors.Black
         )
         self.wavelength_txt_box = ctk.CTkTextbox(
-            self, width=200, height=20, corner_radius=10, font=self.text_font
+            self, width=200, height=20, corner_radius=10, font=self.text_font, bg_color=UIColors.White, fg_color=UIColors.LightGray, text_color=UIColors.Black
         )
         self.wavelength_txt_box_label = ctk.CTkLabel(
-            self, text="Wavelength (nm)", font=self.label_font
+            self, text="Wavelength (nm)", font=self.label_font, text_color=UIColors.Black
         )
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
         self.power_txt_box_label.place(x=335, y=12)
