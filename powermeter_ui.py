@@ -109,16 +109,33 @@ class MainWindow(tk.Frame):
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
         self.power_txt_box = ctk.CTkTextbox(
-            self, width=200, height=20, corner_radius=10, font=self.text_font, bg_color=UIColors.White, fg_color=UIColors.LightGray, text_color=UIColors.Black
+            self,
+            width=200,
+            height=20,
+            corner_radius=10,
+            font=self.text_font,
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
         )
         self.power_txt_box_label = ctk.CTkLabel(
             self, text="Power (W)", font=self.label_font, text_color=UIColors.Black
         )
         self.wavelength_txt_box = ctk.CTkTextbox(
-            self, width=200, height=20, corner_radius=10, font=self.text_font, bg_color=UIColors.White, fg_color=UIColors.LightGray, text_color=UIColors.Black
+            self,
+            width=200,
+            height=20,
+            corner_radius=10,
+            font=self.text_font,
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
         )
         self.wavelength_txt_box_label = ctk.CTkLabel(
-            self, text="Wavelength (nm)", font=self.label_font, text_color=UIColors.Black
+            self,
+            text="Wavelength (nm)",
+            font=self.label_font,
+            text_color=UIColors.Black,
         )
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
         self.power_txt_box_label.place(x=335, y=12)
