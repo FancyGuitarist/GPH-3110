@@ -1,3 +1,10 @@
+## [0.4.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.3.4...v0.4.0) (2025-01-27)
+
+
+### Features
+
+* UIColors for uniform colors ([86854e4](https://github.com/FancyGuitarist/GPH-3110/commit/86854e453e75ff8d047e0b4b1182b39315335622))
+
 ## [0.3.4](https://github.com/FancyGuitarist/GPH-3110/compare/v0.3.3...v0.3.4) (2025-01-20)
 
 ## [0.3.3](https://github.com/FancyGuitarist/GPH-3110/compare/v0.3.2...v0.3.3) (2025-01-20)
