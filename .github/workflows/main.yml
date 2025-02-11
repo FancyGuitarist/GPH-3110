@@ -1,4 +1,4 @@
-name: Build ARM Mac App
+name: Build Windows & Mac Apps
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   pull_request:
   
 jobs:
-    build-windows:
+    build_windows:
       runs-on: windows-latest
   
       steps:
@@ -54,9 +54,6 @@ jobs:
       - name: Create ZIP Archive on Windows
         run: |
           Compress-Archive dist/powermeter_ui.exe PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
-          ls
-          cd dist
-          ls
         shell: pwsh
         
       - name: Upload Windows Artifact
@@ -65,9 +62,9 @@ jobs:
           name: PowerMeterWindows${{ steps.changelog.outputs.tag }}
           path: PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
         
-    build-mac:
+    build_mac_and_release:
       runs-on: macos-latest
-      needs: build-windows
+      needs: build_windows
   
       steps:
       - name: Checkout repository
@@ -143,7 +140,7 @@ jobs:
       - name: Download Windows Artifact
         uses: actions/download-artifact@v4
         with:
-          name: PowerMeterWindows
+          name: PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
           path: .
            
       - name: GH Release
