@@ -1,3 +1,5 @@
+## [0.4.11](https://github.com/FancyGuitarist/GPH-3110/compare/v0.4.10...v0.4.11) (2025-02-11)
+
 ## [0.4.10](https://github.com/FancyGuitarist/GPH-3110/compare/v0.4.9...v0.4.10) (2025-02-11)
 
 ## [0.4.9](https://github.com/FancyGuitarist/GPH-3110/compare/v0.4.8...v0.4.9) (2025-02-11)
