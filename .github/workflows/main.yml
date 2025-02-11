@@ -7,13 +7,14 @@ on:
   pull_request:
   
 jobs:
-    build_windows:
-      runs-on: windows-latest
-  
-      steps:
+  get_version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.changelog.outputs.tag }}
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        
+
       - name: Conventional Changelog Action
         id: changelog
         uses: TriPSs/conventional-changelog-action@latest
@@ -22,6 +23,17 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           release-count: 0
           skip-on-empty: "false"
+    
+  build_windows:
+      runs-on: windows-latest
+      needs: get_version
+  
+      steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Use Version
+        run: echo "Version is ${{ needs.get_version.outputs.version }}"
   
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -53,16 +65,16 @@ jobs:
           
       - name: Create ZIP Archive on Windows
         run: |
-          Compress-Archive dist/powermeter_ui.exe PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
+          Compress-Archive dist/powermeter_ui.exe PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
         shell: pwsh
         
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
-          path: PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
+          name: PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
+          path: PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
         
-    build_mac_and_release:
+  build_mac_and_release:
       runs-on: macos-latest
       needs: build_windows
   
@@ -70,14 +82,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         
-      - name: Conventional Changelog Action
-        id: changelog
-        uses: TriPSs/conventional-changelog-action@latest
-        with:
-          preset: "conventionalcommits"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          release-count: 0
-          skip-on-empty: "false"
+      - name: Use Version
+        run: echo "Version is ${{ needs.get_version.outputs.version }}"
   
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -100,7 +106,7 @@ jobs:
   
       - name: Update App Version in powermeter_ui.py
         run: |
-          sed -i "" "s/v\.[0-9]*\.[0-9]*\.[0-9]*/${{ steps.changelog.outputs.tag }}/" powermeter_ui.py
+          sed -i "" "s/v\.[0-9]*\.[0-9]*\.[0-9]*/${{ needs.get_version.outputs.version }}/" powermeter_ui.py
   
       - name: Run ruff to format code
         run: |
@@ -135,7 +141,7 @@ jobs:
       - name: Zip App
         run: |
            cd dist/
-           zip -r PowerMeterMac${{ steps.changelog.outputs.tag }}.zip *.app
+           zip -r PowerMeterMac${{ needs.get_version.outputs.version }}.zip *.app
            
       - name: Download Windows Artifact
         uses: actions/download-artifact@v4
@@ -149,10 +155,10 @@ jobs:
         env:
           POWERMETER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with: 
-          tag_name: ${{ steps.changelog.outputs.tag }}
-          name: ${{ steps.changelog.outputs.tag }}
+          tag_name: ${{ needs.get_version.outputs.version }}
+          name: ${{ needs.get_version.outputs.version }}
           files: |
-              dist/PowerMeter${{ steps.changelog.outputs.tag }}.zip
-              PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
+              dist/PowerMeter${{ needs.get_version.outputs.version }}.zip
+              PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
               CHANGELOG.md
               
