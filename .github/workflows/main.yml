@@ -76,7 +76,7 @@ jobs:
         
   build_mac_and_release:
       runs-on: macos-latest
-      needs: build_windows
+      needs: [build_windows, get_version]
   
       steps:
       - name: Checkout repository
