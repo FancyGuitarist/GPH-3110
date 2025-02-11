@@ -45,11 +45,11 @@ jobs:
         python
         print("Files in directory after pyinstaller")
         
-    - name: Zip App
+    - name: Create ZIP Archive on Windows
       run: |
-         cd dist/
-         zip -r PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip *.exe
-         
+        Compress-Archive -Path *.exe -DestinationPath PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
+      shell: pwsh
+
     - name: GH Release
       uses: softprops/action-gh-release@v2
       if: ${{ steps.changelog.outputs.skipped == 'false' }}
