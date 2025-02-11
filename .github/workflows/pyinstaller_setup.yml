@@ -32,9 +32,10 @@ jobs:
         venv/Scripts/activate
         cp -r tk_files/* venv/lib/
 
-    - name: Update App Version in powermeter_ui.py
+    - name: Update App version for Windows PowerShell
       run: |
-        sed -i "" "s/v\.[0-9]*\.[0-9]*\.[0-9]*/${{ steps.changelog.outputs.tag }}/" powermeter_ui.py
+        (Get-Content powermeter_ui.py) -replace "v\.\d+\.\d+\.\d+", "" | Set-Content powermeter_ui.py
+      shell: pwsh
 
     - name: Build App
       run: |
