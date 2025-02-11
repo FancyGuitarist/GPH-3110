@@ -47,6 +47,7 @@ jobs:
           $TAG="${{ steps.changelog.outputs.tag }}"
           $ZIPNAME="PowerMeterWindows$TAG.zip"
           Compress-Archive -Path *.exe -DestinationPath $ZIPNAME
+          ls
           cd dist
           ls
         shell: pwsh
