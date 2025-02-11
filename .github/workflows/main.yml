@@ -41,19 +41,19 @@ jobs:
         run: |
           venv/Scripts/activate
           pyinstaller --onefile powermeter_ui.py
-          ls
-          python
-          print("Files in directory after pyinstaller")
           
       - name: Create ZIP Archive on Windows
         run: |
           Compress-Archive -Path *.exe -DestinationPath PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
+          ls
+          python
+          print("Files in directory after zip Windows")
         shell: pwsh
         
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PowerMeterWindows
+          name: PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
           path: PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
         
     build-mac:
