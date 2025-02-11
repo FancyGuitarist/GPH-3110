@@ -1,0 +1,62 @@
+name: Build Windows App
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+  
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12.3'
+
+    - name: Install dependencies
+      run: |
+        python -m venv venv
+        venv/Scripts/activate
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Copy tk files into lib of venv
+      run: |
+        venv/Scripts/activate
+        cp -r tk_files/* venv/lib/
+
+    - name: Update App Version in powermeter_ui.py
+      run: |
+        sed -i "" "s/v\.[0-9]*\.[0-9]*\.[0-9]*/${{ steps.changelog.outputs.tag }}/" powermeter_ui.py
+
+    - name: Build App
+      run: |
+        venv/Scripts/activate
+        pyinstaller --onefile powermeter_ui.py
+        ls
+        python
+        print("Files in directory after pyinstaller")
+        
+    - name: Zip App
+      run: |
+         cd dist/
+         zip -r PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip *.exe
+         
+    - name: GH Release
+      uses: softprops/action-gh-release@v2
+      if: ${{ steps.changelog.outputs.skipped == 'false' }}
+      env:
+        POWERMETER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with: 
+        tag_name: ${{ steps.changelog.outputs.tag }}
+        name: ${{ steps.changelog.outputs.tag }}
+        files: |
+            dist/PowerMeterWindows${{ steps.changelog.outputs.tag }}.zip
+            CHANGELOG.md
+            
