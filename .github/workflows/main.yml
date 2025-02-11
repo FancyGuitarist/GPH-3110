@@ -159,7 +159,7 @@ jobs:
           tag_name: ${{ needs.get_version.outputs.version }}
           name: ${{ needs.get_version.outputs.version }}
           files: |
-              dist/PowerMeter${{ needs.get_version.outputs.version }}.zip
+              dist/PowerMeterMac${{ needs.get_version.outputs.version }}.zip
               PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
               CHANGELOG.md
               
