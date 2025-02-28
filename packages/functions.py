@@ -64,7 +64,8 @@ class PowerMeter:
 
     def findIncidentPower(self, temps: list):
         pass
-    def estimateAbsorbanceOfGlass(self, temps: list, glass_type : Glasses):
+
+    def estimateAbsorbanceOfGlass(self, temps: list, glass_type: Glasses):
         pass
 
     def estimateWaveLength(self, glasses: list[Glasses]):
