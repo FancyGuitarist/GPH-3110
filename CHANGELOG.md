@@ -1,3 +1,10 @@
+## [0.5.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.4.23...v0.5.0) (2025-02-28)
+
+
+### Features
+
+* position approximation ([71bb7d9](https://github.com/FancyGuitarist/GPH-3110/commit/71bb7d95fb4d10116ca202cf668d0e9224300575))
+
 ## [0.4.23](https://github.com/FancyGuitarist/GPH-3110/compare/v0.4.22...v0.4.23) (2025-02-20)
 
 ## [0.4.22](https://github.com/FancyGuitarist/GPH-3110/compare/v0.4.21...v0.4.22) (2025-02-11)
