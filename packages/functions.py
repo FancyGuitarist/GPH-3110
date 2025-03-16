@@ -1,4 +1,6 @@
-from enum import StrEnum
+from enum import StrEnum, Enum
+import pandas as pd
+from pathlib import Path
 import numpy as np
 import random
 
@@ -41,30 +43,54 @@ class Thermistance:
         return 1 / T_inv - 273.15  # Convert to Celsius
 
 
-class Glasses(StrEnum):
+class GlassType(StrEnum):
     VG9 = "VG9"
     KG2 = "KG2"
     NG11 = "NG11"
 
+
+class Glass:
+    def __init__(self, glass_type: GlassType):
+        self.glass_type = glass_type
+        self.ng11_spectrum = pd.read_csv(Path("Glass_Spectrums", "NG11.csv"))
+        self.kg2_spectrum = pd.read_csv(Path("Glass_Spectrums", "KG2.csv"))
+        self.vg9_spectrum = None
+
     @property
     def n_properties(self):
         properties = {}
-        match self:
-            case Glasses.VG9:
+        match self.glass_type:
+            case GlassType.VG9:
                 properties["a"] = [1.1839, 0.00763]
                 properties["b"] = [0.0336, 0.043272]
                 properties["c"] = [1.111, 116.448]
-            case Glasses.KG2:
+            case GlassType.KG2:
                 properties["a"] = [1.171719, 0.006324]
                 properties["b"] = [0.097958, 0.031092]
                 properties["c"] = [0.071306, 10.066]
-            case Glasses.NG11:
+            case GlassType.NG11:
                 properties["a"] = [0.3483, 0.01326]
                 properties["b"] = [1.0034, 0.012265]
                 properties["c"] = [34.8247, 5797.735]
         return properties
 
+    @property
+    def transmission_spectrum(self):
+        match self.glass_type:
+            case GlassType.VG9:
+                return self.vg9_spectrum
+            case GlassType.KG2:
+                return self.kg2_spectrum
+            case GlassType.NG11:
+                return self.ng11_spectrum
 
+    @property
+    def transmission_values(self):
+        return self.transmission_spectrum["Transmission"]
+
+    @property
+    def wavelength_values(self):
+        return self.transmission_spectrum["Wavelength"]
 
 
 class PlateProperties(StrEnum):
@@ -83,7 +109,7 @@ class PowerMeter:
         self.incident_power = 0
         self.absorbance = 0
         self.wavelength = 0
-        self.glasses = [Glasses.NG11,  Glasses.KG2, Glasses.VG9]
+        self.glasses = [Glass(GlassType.NG11),  Glass(GlassType.KG2), Glass(GlassType.VG9)]
         self.thermistances = thermistances
 
     def n_glasses(self, lambda_: float):
@@ -105,8 +131,8 @@ class PowerMeter:
     def get_incident_power(self, temps: list):
         pass
 
-    def estimate_absorbance_of_glass(self, temps: list, glass_type: Glasses):
+    def estimate_absorbance_of_glass(self, temps: list, glass_type: Glass):
         pass
 
-    def estimate_wavelength(self, glasses: list[Glasses]):
+    def estimate_wavelength(self, glasses: list[Glass]):
         pass
