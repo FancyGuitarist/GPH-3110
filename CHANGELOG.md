@@ -1,3 +1,10 @@
+## [0.5.3](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.2...v0.5.3) (2025-03-16)
+
+
+### Bug Fixes
+
+* spectrum_cache ([8bf7ba6](https://github.com/FancyGuitarist/GPH-3110/commit/8bf7ba6eea20545441e1449d05278ee8b815de1a))
+
 ## [0.5.2](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.1...v0.5.2) (2025-03-16)
 
 
