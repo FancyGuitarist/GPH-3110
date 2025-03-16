@@ -1,3 +1,10 @@
+## [0.5.2](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.1...v0.5.2) (2025-03-16)
+
+
+### Bug Fixes
+
+* Glass class issues ([a1ad82f](https://github.com/FancyGuitarist/GPH-3110/commit/a1ad82f06f85fd1ce63abb0f3ad517431fadf0b2))
+
 ## [0.5.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.0...v0.5.1) (2025-03-16)
 
 ## [0.5.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.4.23...v0.5.0) (2025-02-28)
