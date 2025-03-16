@@ -85,9 +85,13 @@ class Glass:
                 case GlassType.VG9:
                     self.spectrum_cache = None
                 case GlassType.KG2:
-                    self.spectrum_cache = pd.read_csv(Path("Glass_Spectrums", "KG2.csv"))
+                    self.spectrum_cache = pd.read_csv(
+                        Path("Glass_Spectrums", "KG2.csv")
+                    )
                 case GlassType.NG11:
-                    self.spectrum_cache = pd.read_csv(Path("Glass_Spectrums", "NG11.csv"))
+                    self.spectrum_cache = pd.read_csv(
+                        Path("Glass_Spectrums", "NG11.csv")
+                    )
             return self.spectrum_cache
 
     @property
