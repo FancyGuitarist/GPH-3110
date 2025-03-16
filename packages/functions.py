@@ -6,8 +6,12 @@ transmission = 0.1
 
 
 class Thermistance:
-    def __init__(self, position: tuple, port: str,
-                 steinhart_coeffs: tuple = (1.844e-3, -3.577e-06, 2.7612e-05, -1.0234e-06)):
+    def __init__(
+        self,
+        position: tuple,
+        port: str,
+        steinhart_coeffs: tuple = (1.844e-3, -3.577e-06, 2.7612e-05, -1.0234e-06),
+    ):
         self.position = position
         self.port = port
         self.steinhart_coeffs = steinhart_coeffs
@@ -65,8 +69,6 @@ class Glasses(StrEnum):
         return properties
 
 
-
-
 class PlateProperties(StrEnum):
     Laserax = "Laserax"
 
@@ -83,16 +85,20 @@ class PowerMeter:
         self.incident_power = 0
         self.absorbance = 0
         self.wavelength = 0
-        self.glasses = [Glasses.NG11,  Glasses.KG2, Glasses.VG9]
+        self.glasses = [Glasses.NG11, Glasses.KG2, Glasses.VG9]
         self.thermistances = thermistances
 
     def n_glasses(self, lambda_: float):
         ns = []
         for glass in self.glasses:
-            a_coeffs, b_coeffs, c_coeffs = glass.n_properties["a"], glass.n_properties["b"], glass.n_properties["c"]
-            a = a_coeffs[0] * lambda_ ** 2 / (lambda_ ** 2 - a_coeffs[1])
-            b = b_coeffs[0] * lambda_ ** 2 / (lambda_ ** 2 - b_coeffs[1])
-            c = c_coeffs[0] * lambda_ ** 2 / (lambda_ ** 2 - c_coeffs[1])
+            a_coeffs, b_coeffs, c_coeffs = (
+                glass.n_properties["a"],
+                glass.n_properties["b"],
+                glass.n_properties["c"],
+            )
+            a = a_coeffs[0] * lambda_**2 / (lambda_**2 - a_coeffs[1])
+            b = b_coeffs[0] * lambda_**2 / (lambda_**2 - b_coeffs[1])
+            c = c_coeffs[0] * lambda_**2 / (lambda_**2 - c_coeffs[1])
             ns.append(np.sqrt(1 + a + b + c))
         return ns
 
