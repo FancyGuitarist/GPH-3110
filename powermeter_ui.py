@@ -137,10 +137,23 @@ class MainWindow(tk.Frame):
             font=self.label_font,
             text_color=UIColors.Black,
         )
-        self.canvas = tk.Canvas(
-            self, width=500, height=500, bg=UIColors.White, highlightthickness=0
+        self.acquisition_button = ctk.CTkButton(
+            self,
+            text="Start Acquisition",
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
+            hover_color=UIColors.DarkGray,
+            corner_radius=5,
+            border_width=2,
+            font=self.label_font,
+            width=60,
+            height=30,
         )
-        self.canvas.place(x=175, y=300)
+        self.canvas = tk.Canvas(
+            self, width=402, height=352, bg=UIColors.White, highlightthickness=0
+        )
+        self.canvas.place(x=175, y=250)
 
         dims = (400, 350)
         self.canvas.create_polygon(
@@ -166,6 +179,7 @@ class MainWindow(tk.Frame):
         self.power_txt_box_label.place(x=335, y=12)
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
         self.wavelength_txt_box_label.place(x=300, y=135)
+        self.acquisition_button.place(x=300, y=625)
         threading.Thread(target=self.update_values).start()
 
     def update_values(self, random=True):

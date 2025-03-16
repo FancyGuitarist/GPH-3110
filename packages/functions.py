@@ -1,4 +1,4 @@
-from enum import StrEnum, Enum
+from enum import StrEnum
 import pandas as pd
 from pathlib import Path
 import numpy as np
@@ -96,11 +96,11 @@ class Glass:
 
     @property
     def transmission_values(self):
-        return self.transmission_spectrum["Transmission"]
+        return self.transmission_spectrum["Transmission"].to_numpy()
 
     @property
     def wavelength_values(self):
-        return self.transmission_spectrum["Wavelength"]
+        return self.transmission_spectrum["Wavelength"].to_numpy()
 
 
 class PlateProperties(StrEnum):
