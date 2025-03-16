@@ -3,8 +3,10 @@ import pandas as pd
 from pathlib import Path
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 
 transmission = 0.1
+home_directory = Path(__file__).parents[1]
 
 
 class Thermistance:
@@ -42,8 +44,9 @@ class Thermistance:
 
     def get_temperature(self):
         R_t = self.get_resistance()
+        R_m = 240  # Intrinsic resistance of the multiplexor
         A, B, C, D = self.steinhart_coeffs
-        T_inv = A + np.log(R_t) * B + np.log(R_t) ** 2 * C + np.log(R_t) ** 3 * D
+        T_inv = A + np.log(R_t - R_m) * B + np.log(R_t - R_m) ** 2 * C + np.log(R_t - R_m) ** 3 * D
         return 1 / T_inv - 273.15  # Convert to Celsius
 
 
@@ -56,6 +59,8 @@ class GlassType(StrEnum):
 class Glass:
     def __init__(self, glass_type: GlassType):
         self.glass_type = glass_type
+        self.transmission_values_cache = None
+        self.wavelength_values_cache = None
         self.spectrum_cache = None
 
     @property
@@ -78,29 +83,39 @@ class Glass:
 
     @property
     def transmission_spectrum(self):
-        if self.spectrum_cache is not None:
-            return self.spectrum_cache
-        else:
+        if self.spectrum_cache is None:
             match self.glass_type:
                 case GlassType.VG9:
-                    self.spectrum_cache = None
+                    self.spectrum_cache = pd.read_csv(
+                        Path(home_directory, "Glass_Spectrums", "VG9.txt")
+                    )
                 case GlassType.KG2:
                     self.spectrum_cache = pd.read_csv(
-                        Path("Glass_Spectrums", "KG2.csv")
+                        Path(home_directory, "Glass_Spectrums", "KG2.csv")
                     )
                 case GlassType.NG11:
                     self.spectrum_cache = pd.read_csv(
-                        Path("Glass_Spectrums", "NG11.csv")
+                        Path(home_directory, "Glass_Spectrums", "NG11.csv")
                     )
-            return self.spectrum_cache
+        return self.spectrum_cache
 
     @property
     def transmission_values(self):
-        return self.transmission_spectrum["Transmission"].to_numpy()
+        if self.transmission_values_cache is None:
+            self.transmission_values_cache = self.transmission_spectrum["Transmission"].to_numpy()
+        return self.transmission_values_cache
 
     @property
     def wavelength_values(self):
-        return self.transmission_spectrum["Wavelength"].to_numpy()
+        if self.wavelength_values_cache is None:
+            self.wavelength_values_cache = self.transmission_spectrum["Wavelength"].to_numpy()
+        return self.wavelength_values_cache
+
+    def show_spectrum(self):
+        plt.plot(self.wavelength_values, self.transmission_values, label=self.glass_type)
+        plt.xlim(200, 2500)
+        plt.ylim(0, 100)
+        plt.show()
 
 
 class PlateProperties(StrEnum):
@@ -154,3 +169,7 @@ class PowerMeter:
 
     def estimate_wavelength(self, glasses: list[Glass]):
         pass
+
+
+if __name__ == '__main__':
+    pass
