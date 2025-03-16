@@ -113,7 +113,11 @@ class PowerMeter:
         self.incident_power = 0
         self.absorbance = 0
         self.wavelength = 0
-        self.glasses = [Glass(GlassType.NG11),  Glass(GlassType.KG2), Glass(GlassType.VG9)]
+        self.glasses = [
+            Glass(GlassType.NG11),
+            Glass(GlassType.KG2),
+            Glass(GlassType.VG9),
+        ]
         self.thermistances = thermistances
 
     def n_glasses(self, lambda_: float):
