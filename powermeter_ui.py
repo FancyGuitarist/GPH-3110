@@ -141,7 +141,7 @@ class MainWindow(tk.Frame):
             self, width=500, height=500, bg=UIColors.White, highlightthickness=0
         )
         self.canvas.place(x=175, y=300)
-        # self.canvas.create_rectangle(0, 0, 550, 500, fill=UIColors.White, outline=UIColors.White)
+
         dims = (400, 350)
         self.canvas.create_polygon(
             (dims[0] / 4, 0),
@@ -152,14 +152,15 @@ class MainWindow(tk.Frame):
             (0, dims[1] / 2),
             fill=UIColors.White,
             outline="black",
-            width=2,
+            width=3,
         )
 
-        x, y = dims[0] / 2, dims[1] / 2
-        positions = np.load("positions_list.npy")
-        for position in positions:
-            x, y = position
-            self.canvas.create_oval(x, y, x + 5, y + 5, fill="red", outline="")
+        x, y = np.load("positions_list.npy")
+        self.canvas.create_oval(x, y, x + 10, y + 10, fill="red", outline="")
+        # positions = np.load("positions_list.npy")
+        # for position in positions:
+        #     x, y = position
+        #     self.canvas.create_oval(x, y, x+5, y+5, fill="red", outline="")
 
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
         self.power_txt_box_label.place(x=335, y=12)
