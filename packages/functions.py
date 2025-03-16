@@ -56,9 +56,7 @@ class GlassType(StrEnum):
 class Glass:
     def __init__(self, glass_type: GlassType):
         self.glass_type = glass_type
-        self.ng11_spectrum = pd.read_csv(Path("Glass_Spectrums", "NG11.csv"))
-        self.kg2_spectrum = pd.read_csv(Path("Glass_Spectrums", "KG2.csv"))
-        self.vg9_spectrum = None
+        self.spectrum_cache = None
 
     @property
     def n_properties(self):
@@ -80,13 +78,17 @@ class Glass:
 
     @property
     def transmission_spectrum(self):
-        match self.glass_type:
-            case GlassType.VG9:
-                return self.vg9_spectrum
-            case GlassType.KG2:
-                return self.kg2_spectrum
-            case GlassType.NG11:
-                return self.ng11_spectrum
+        if self.spectrum_cache is not None:
+            return self.spectrum_cache
+        else:
+            match self.glass_type:
+                case GlassType.VG9:
+                    self.spectrum_cache = None
+                case GlassType.KG2:
+                    self.spectrum_cache = pd.read_csv(Path("Glass_Spectrums", "KG2.csv"))
+                case GlassType.NG11:
+                    self.spectrum_cache = pd.read_csv(Path("Glass_Spectrums", "NG11.csv"))
+            return self.spectrum_cache
 
     @property
     def transmission_values(self):
