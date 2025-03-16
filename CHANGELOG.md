@@ -1,3 +1,10 @@
+## [0.5.4](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.3...v0.5.4) (2025-03-16)
+
+
+### Bug Fixes
+
+* VG9 data added ([3a2dadf](https://github.com/FancyGuitarist/GPH-3110/commit/3a2dadf474ac9158115ee61892b57fb72e8c4ca4))
+
 ## [0.5.3](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.2...v0.5.3) (2025-03-16)
 
 
