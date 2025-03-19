@@ -8,12 +8,23 @@ import scipy.optimize as opt
 
 transmission = 0.1
 home_directory = Path(__file__).parents[1]
-T_values = [297.800093871208, 297.795935403683, 300, 297.793461919386, 297.797705629502, 297.801065549678]
+T_values = [
+    297.800093871208,
+    297.795935403683,
+    300,
+    297.793461919386,
+    297.797705629502,
+    297.801065549678,
+]
 
 
 def gaussian_2d(coords: tuple, A, x0, y0, sigma_x, sigma_y, T_0):
     x, y = coords
-    return A * np.exp(-((x - x0)**2 / (2 * sigma_x**2) + (y - y0)**2 / (2 * sigma_y**2))) + T_0
+    return (
+        A
+        * np.exp(-((x - x0) ** 2 / (2 * sigma_x**2) + (y - y0) ** 2 / (2 * sigma_y**2)))
+        + T_0
+    )
 
 
 class Thermistance:
@@ -67,7 +78,12 @@ class Thermistance:
             R_t = self.get_resistance()
             R_m = 240  # Intrinsic resistance of the multiplexor
             A, B, C, D = self.steinhart_coeffs
-            T_inv = A + np.log(R_t - R_m) * B + np.log(R_t - R_m) ** 2 * C + np.log(R_t - R_m) ** 3 * D
+            T_inv = (
+                A
+                + np.log(R_t - R_m) * B
+                + np.log(R_t - R_m) ** 2 * C
+                + np.log(R_t - R_m) ** 3 * D
+            )
             return 1 / T_inv - 273.15  # Convert to Celsius
         else:
             return T_values[int(self.port[-1])]
@@ -125,22 +141,34 @@ class Glass:
     @property
     def transmission_values(self):
         if self.transmission_values_cache is None:
-            self.transmission_values_cache = self.transmission_spectrum["Transmission"].to_numpy()
+            self.transmission_values_cache = self.transmission_spectrum[
+                "Transmission"
+            ].to_numpy()
         return self.transmission_values_cache
 
     @property
     def wavelength_values(self):
         if self.wavelength_values_cache is None:
-            self.wavelength_values_cache = self.transmission_spectrum["Wavelength"].to_numpy()
+            self.wavelength_values_cache = self.transmission_spectrum[
+                "Wavelength"
+            ].to_numpy()
         return self.wavelength_values_cache
 
-    def get_potential_wavelengths(self, read_transmission: float, interval: float = 0.1):
-        candidates_upper = self.transmission_values < read_transmission + (interval * read_transmission)
-        candidates_lower = self.transmission_values > read_transmission - (interval * read_transmission)
+    def get_potential_wavelengths(
+        self, read_transmission: float, interval: float = 0.1
+    ):
+        candidates_upper = self.transmission_values < read_transmission + (
+            interval * read_transmission
+        )
+        candidates_lower = self.transmission_values > read_transmission - (
+            interval * read_transmission
+        )
         return self.wavelength_values[candidates_upper & candidates_lower]
 
     def show_spectrum(self):
-        plt.plot(self.wavelength_values, self.transmission_values, label=self.glass_type)
+        plt.plot(
+            self.wavelength_values, self.transmission_values, label=self.glass_type
+        )
         plt.xlim(200, 2500)
         plt.ylim(0, 100)
         plt.show()
@@ -172,14 +200,22 @@ class PowerMeter:
     def setup_thermistance_grid(self):
         self.thermistances = []
         for i in range(6):
-            self.thermistances.append(Thermistance((0.550, np.pi/3 + i * np.pi/3), f"port{i}"))
+            self.thermistances.append(
+                Thermistance((0.550, np.pi / 3 + i * np.pi / 3), f"port{i}")
+            )
         return self.thermistances
 
     def get_temperature_values(self):
         return [thermistance.get_temperature() for thermistance in self.thermistances]
 
     def get_laser_params(self):
-        self.laser_params, _ = opt.curve_fit(gaussian_2d, self.xy_coords, self.get_temperature_values(), p0=self.laser_initial_guesses, maxfev=1000)
+        self.laser_params, _ = opt.curve_fit(
+            gaussian_2d,
+            self.xy_coords,
+            self.get_temperature_values(),
+            p0=self.laser_initial_guesses,
+            maxfev=1000,
+        )
         return self.laser_params
 
     def n_glasses(self, lambda_: float):
@@ -209,5 +245,5 @@ class PowerMeter:
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

@@ -246,8 +246,16 @@ class MainWindow(tk.Frame):
             x, y = positions[:, index]
             current_color = colormap(norm(temps[index]))
             current_color_hex = mcolors.rgb2hex(current_color)
-            self.canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill=str(current_color_hex), outline="black", width=1,
-                               tags="overlay")
+            self.canvas.create_oval(
+                x - 5,
+                y - 5,
+                x + 5,
+                y + 5,
+                fill=str(current_color_hex),
+                outline="black",
+                width=1,
+                tags="overlay",
+            )
 
 
 class OtherWindow(tk.Frame):
