@@ -1,3 +1,10 @@
+## [0.7.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.6.3...v0.7.0) (2025-03-19)
+
+
+### Features
+
+* Circular Mask ([bb3e29f](https://github.com/FancyGuitarist/GPH-3110/commit/bb3e29f47b92949a278f95e0b03ebc546f050a4a))
+
 ## [0.6.3](https://github.com/FancyGuitarist/GPH-3110/compare/v0.6.2...v0.6.3) (2025-03-19)
 
 
