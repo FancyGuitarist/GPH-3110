@@ -9,6 +9,7 @@ import matplotlib.colors as mcolors
 from packages.functions import gaussian_2d, PowerMeter
 from PIL import Image, ImageTk
 from pathlib import Path
+from skimage.draw import disk
 
 home_directory = Path(__file__).parents[0]
 
@@ -55,6 +56,22 @@ class UIColors(StrEnum):
     LightGray = "#B6B5B5"
     DarkGray = "#3D3F41"
     Black = "#202020"
+
+    @property
+    def red_value(self):
+        return int(self.value[1:3], 16)
+
+    @property
+    def blue_value(self):
+        return int(self.value[3:5], 16)
+
+    @property
+    def green_value(self):
+        return int(self.value[5:], 16)
+
+    @property
+    def rgb_value(self):
+        return np.array([self.red_value, self.green_value, self.blue_value]).astype(np.uint8)
 
 
 class PowerMeterUI(tk.Tk):
@@ -117,7 +134,7 @@ class MainWindow(tk.Frame):
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
         self.power_meter = PowerMeter()
         self.mask_path = home_directory / "pointing_mask.png"
-        self.mask_cache = None
+        self.plate_mask_cache = None
         self.img_tk = None
         self.X, self.Y = np.meshgrid(np.linspace(-1, 1, 400), np.linspace(-1, 1, 400))
         self.power_txt_box = ctk.CTkTextbox(
@@ -163,7 +180,7 @@ class MainWindow(tk.Frame):
             height=30,
         )
         self.canvas = tk.Canvas(
-            self, width=400, height=350, bg=UIColors.White, highlightthickness=1
+            self, width=400, height=350, bg=UIColors.White, highlightthickness=0
         )
         self.canvas.place(x=175, y=250)
         self.image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
@@ -191,16 +208,26 @@ class MainWindow(tk.Frame):
             self.wavelength_txt_box.update_text_box(f"{wavelength}")
             time.sleep(interval)
 
-    def get_mask_array(self):
-        if self.mask_cache is None:
+    def get_plate_mask_array(self):
+        if self.plate_mask_cache is None:
             mask_img = Image.open(self.mask_path)
             mask_img = mask_img.resize((400, 400))
             mask_array = np.array(mask_img.convert("RGB"))
-            self.mask_cache = np.invert(mask_array.astype(np.bool))
-        return self.mask_cache
+            self.plate_mask_cache = np.invert(mask_array.astype(np.bool))
+        return self.plate_mask_cache
+
+    def get_circular_mask_array(self):
+        mask = np.zeros((400, 400, 3), dtype=np.uint8)
+        radius = 100
+        rr, cc = disk((185, 200), radius)
+        mask[rr, cc, :] = 1
+        return mask
 
     def apply_masks_to_gradient(self, img_array):
-        return img_array * self.get_mask_array()
+        circular_mask_array = self.get_circular_mask_array()
+        background = np.invert(circular_mask_array.astype(np.bool)) * UIColors.White.rgb_value
+        masked_array = img_array * self.get_plate_mask_array() * circular_mask_array + background
+        return masked_array
 
     def update_gradient(self):
         params = self.power_meter.get_laser_params()
