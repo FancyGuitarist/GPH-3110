@@ -5,3 +5,4 @@ venv/
 /venv/
 /tests.py
 /tests_2.py
+/gaussian_tests.py

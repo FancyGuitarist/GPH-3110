@@ -4,7 +4,13 @@ import numpy as np
 import time
 import threading
 from enum import StrEnum
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+from packages.functions import gaussian_2d, PowerMeter
+from PIL import Image, ImageTk
+from pathlib import Path
 
+home_directory = Path(__file__).parents[0]
 
 def setup_grid(self, rows: int, cols: int):
     """
@@ -108,6 +114,11 @@ class MainWindow(tk.Frame):
         self.setup_grid(6, 3)
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
+        self.power_meter = PowerMeter()
+        self.mask_path = home_directory / "pointing_mask.png"
+        self.mask_cache = None
+        self.img_tk = None
+        self.X, self.Y = np.meshgrid(np.linspace(-1, 1, 400), np.linspace(-1, 1, 400))
         self.power_txt_box = ctk.CTkTextbox(
             self,
             width=200,
@@ -151,29 +162,10 @@ class MainWindow(tk.Frame):
             height=30,
         )
         self.canvas = tk.Canvas(
-            self, width=402, height=352, bg=UIColors.White, highlightthickness=0
+            self, width=400, height=350, bg=UIColors.White, highlightthickness=1
         )
         self.canvas.place(x=175, y=250)
-
-        dims = (400, 350)
-        self.canvas.create_polygon(
-            (dims[0] / 4, 0),
-            ((dims[0] / 4) * 3, 0),
-            (dims[0], dims[1] / 2),
-            ((dims[0] / 4) * 3, dims[1]),
-            (dims[0] / 4, dims[1]),
-            (0, dims[1] / 2),
-            fill=UIColors.White,
-            outline="black",
-            width=3,
-        )
-
-        x, y = np.load("positions_list.npy")
-        self.canvas.create_oval(x, y, x + 10, y + 10, fill="red", outline="")
-        # positions = np.load("positions_list.npy")
-        # for position in positions:
-        #     x, y = position
-        #     self.canvas.create_oval(x, y, x+5, y+5, fill="red", outline="")
+        self.image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
 
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
         self.power_txt_box_label.place(x=335, y=12)
@@ -181,6 +173,7 @@ class MainWindow(tk.Frame):
         self.wavelength_txt_box_label.place(x=300, y=135)
         self.acquisition_button.place(x=300, y=625)
         threading.Thread(target=self.update_values).start()
+        threading.Thread(target=self.update_gradient).start()
 
     def update_values(self, random=True):
         """
@@ -196,6 +189,41 @@ class MainWindow(tk.Frame):
             self.power_txt_box.update_text_box(f"{power}")
             self.wavelength_txt_box.update_text_box(f"{wavelength}")
             time.sleep(interval)
+
+    def get_mask_array(self):
+        if self.mask_cache is None:
+            mask_img = Image.open(self.mask_path)
+            mask_img = mask_img.resize((400, 400))
+            mask_array = np.array(mask_img.convert("RGB"))
+            self.mask_cache = np.invert(mask_array.astype(np.bool))
+        return self.mask_cache
+
+    def apply_masks_to_gradient(self, img_array):
+        return img_array * self.get_mask_array()
+
+    def update_gradient(self):
+        params = self.power_meter.get_laser_params([297.800093871208, 297.795935403683, 300, 297.793461919386, 297.797705629502, 297.801065549678])
+        Z = gaussian_2d((self.X, self.Y), *params)
+
+        # Normalize the data to fit a colormap
+        norm = mcolors.Normalize(vmin=np.min(Z), vmax=np.max(Z))
+        colormap = cm.get_cmap("coolwarm")
+
+        # Convert the Gaussian values to RGB colors
+        img_array = (colormap(norm(Z))[:, :, :3] * 255).astype(np.uint8)
+        img_array = self.apply_masks_to_gradient(img_array)
+
+        # Convert to PIL Image
+        img = Image.fromarray(img_array)
+
+        # Convert to Tkinter-compatible format
+        self.img_tk = ImageTk.PhotoImage(img)
+
+        # Update the label's image
+        self.canvas.itemconfig(self.image_id, image=self.img_tk)
+
+        # Schedule next update (simulate real-time data)
+        self.canvas.after(1000, self.update_gradient)  # Update every second
 
 
 class OtherWindow(tk.Frame):
