@@ -71,7 +71,9 @@ class UIColors(StrEnum):
 
     @property
     def rgb_value(self):
-        return np.array([self.red_value, self.green_value, self.blue_value]).astype(np.uint8)
+        return np.array([self.red_value, self.green_value, self.blue_value]).astype(
+            np.uint8
+        )
 
 
 class PowerMeterUI(tk.Tk):
@@ -225,8 +227,12 @@ class MainWindow(tk.Frame):
 
     def apply_masks_to_gradient(self, img_array):
         circular_mask_array = self.get_circular_mask_array()
-        background = np.invert(circular_mask_array.astype(np.bool)) * UIColors.White.rgb_value
-        masked_array = img_array * self.get_plate_mask_array() * circular_mask_array + background
+        background = (
+            np.invert(circular_mask_array.astype(np.bool)) * UIColors.White.rgb_value
+        )
+        masked_array = (
+            img_array * self.get_plate_mask_array() * circular_mask_array + background
+        )
         return masked_array
 
     def update_gradient(self):
