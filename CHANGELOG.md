@@ -1,3 +1,10 @@
+## [0.6.3](https://github.com/FancyGuitarist/GPH-3110/compare/v0.6.2...v0.6.3) (2025-03-19)
+
+
+### Bug Fixes
+
+* removed py2app and pyinstaller from requirements ([3b1ef7c](https://github.com/FancyGuitarist/GPH-3110/commit/3b1ef7cf929bb5738258c96aeb2b61939926aea6))
+
 ## [0.6.2](https://github.com/FancyGuitarist/GPH-3110/compare/v0.6.1...v0.6.2) (2025-03-19)
 
 ## [0.6.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.6.0...v0.6.1) (2025-03-19)
