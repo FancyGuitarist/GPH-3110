@@ -8,6 +8,7 @@ import scipy.optimize as opt
 
 transmission = 0.1
 home_directory = Path(__file__).parents[1]
+T_values = [297.800093871208, 297.795935403683, 300, 297.793461919386, 297.797705629502, 297.801065549678]
 
 
 def gaussian_2d(coords: tuple, A, x0, y0, sigma_x, sigma_y, T_0):
@@ -29,6 +30,7 @@ class Thermistance:
         self.position = position
         self.port = port
         self.steinhart_coeffs = (1.844e-3, -3.577e-06, 2.7612e-05, -1.0234e-06)
+        self.demo_mode = True
 
     def __repr__(self):
         return f"Position: {self.position[0]}e^{self.position[1]}j, Port: {self.port}"
@@ -61,11 +63,14 @@ class Thermistance:
         return (130 - 230 * G_w) / (10 + 23 * G_w)
 
     def get_temperature(self):
-        R_t = self.get_resistance()
-        R_m = 240  # Intrinsic resistance of the multiplexor
-        A, B, C, D = self.steinhart_coeffs
-        T_inv = A + np.log(R_t - R_m) * B + np.log(R_t - R_m) ** 2 * C + np.log(R_t - R_m) ** 3 * D
-        return 1 / T_inv - 273.15  # Convert to Celsius
+        if not self.demo_mode:
+            R_t = self.get_resistance()
+            R_m = 240  # Intrinsic resistance of the multiplexor
+            A, B, C, D = self.steinhart_coeffs
+            T_inv = A + np.log(R_t - R_m) * B + np.log(R_t - R_m) ** 2 * C + np.log(R_t - R_m) ** 3 * D
+            return 1 / T_inv - 273.15  # Convert to Celsius
+        else:
+            return T_values[int(self.port[-1])]
 
 
 class GlassType(StrEnum):
@@ -170,8 +175,11 @@ class PowerMeter:
             self.thermistances.append(Thermistance((0.550, np.pi/3 + i * np.pi/3), f"port{i}"))
         return self.thermistances
 
-    def get_laser_params(self, T_values: list):
-        self.laser_params, _ = opt.curve_fit(gaussian_2d, self.xy_coords, T_values, p0=self.laser_initial_guesses, maxfev=1000)
+    def get_temperature_values(self):
+        return [thermistance.get_temperature() for thermistance in self.thermistances]
+
+    def get_laser_params(self):
+        self.laser_params, _ = opt.curve_fit(gaussian_2d, self.xy_coords, self.get_temperature_values(), p0=self.laser_initial_guesses, maxfev=1000)
         return self.laser_params
 
     def n_glasses(self, lambda_: float):

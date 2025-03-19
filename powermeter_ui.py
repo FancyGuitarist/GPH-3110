@@ -12,6 +12,7 @@ from pathlib import Path
 
 home_directory = Path(__file__).parents[0]
 
+
 def setup_grid(self, rows: int, cols: int):
     """
     Sets up the grid layout to place the buttons automatically in the current frame.
@@ -202,7 +203,7 @@ class MainWindow(tk.Frame):
         return img_array * self.get_mask_array()
 
     def update_gradient(self):
-        params = self.power_meter.get_laser_params([297.800093871208, 297.795935403683, 300, 297.793461919386, 297.797705629502, 297.801065549678])
+        params = self.power_meter.get_laser_params()
         Z = gaussian_2d((self.X, self.Y), *params)
 
         # Normalize the data to fit a colormap
@@ -222,8 +223,31 @@ class MainWindow(tk.Frame):
         # Update the label's image
         self.canvas.itemconfig(self.image_id, image=self.img_tk)
 
+        self.draw_overlay_shapes(norm, colormap)
+
         # Schedule next update (simulate real-time data)
         self.canvas.after(1000, self.update_gradient)  # Update every second
+
+    def get_ui_thermistance_positions(self):
+        positions = np.array(self.power_meter.xy_coords)
+        positions[0, :] -= np.min(positions[0, :])
+        positions[1, :] -= np.min(positions[1, :])
+        positions /= np.max(positions)
+        positions *= 200
+        return positions + 100
+
+    def draw_overlay_shapes(self, norm, colormap):
+        """Draw circles or other shapes on top of the heatmap"""
+        self.canvas.delete("overlay")  # Remove previous shapes
+        temps = self.power_meter.get_temperature_values()
+        positions = self.get_ui_thermistance_positions()
+
+        for index in range(len(temps)):
+            x, y = positions[:, index]
+            current_color = colormap(norm(temps[index]))
+            current_color_hex = mcolors.rgb2hex(current_color)
+            self.canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill=str(current_color_hex), outline="black", width=1,
+                               tags="overlay")
 
 
 class OtherWindow(tk.Frame):
