@@ -1,3 +1,12 @@
+## [0.6.2](https://github.com/FancyGuitarist/GPH-3110/compare/v0.6.1...v0.6.2) (2025-03-19)
+
+## [0.6.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.6.0...v0.6.1) (2025-03-19)
+
+
+### Bug Fixes
+
+* Updated requirements ([cf464e8](https://github.com/FancyGuitarist/GPH-3110/commit/cf464e8023c996b70bea136c6e631cf9db019306))
+
 ## [0.6.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.4...v0.6.0) (2025-03-19)
 
 
