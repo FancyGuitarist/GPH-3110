@@ -1,3 +1,17 @@
+## [0.6.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.4...v0.6.0) (2025-03-19)
+
+
+### Features
+
+* A lotta shit ([c122b42](https://github.com/FancyGuitarist/GPH-3110/commit/c122b42f8d067ae7ff3edbb307b289543db0b80b))
+* Plotting transmission spectra ([d31d690](https://github.com/FancyGuitarist/GPH-3110/commit/d31d690d50245e4f3088df97fad32965c125d0c4))
+* thermistance overlay in UI ([d63307a](https://github.com/FancyGuitarist/GPH-3110/commit/d63307a3f68aa503a3b7b5b416213dc42fd276b4))
+
+
+### Bug Fixes
+
+* filename VG9 ([44064d5](https://github.com/FancyGuitarist/GPH-3110/commit/44064d5d433a53f648d6a152f0f7dd7ded3551c1))
+
 ## [0.5.4](https://github.com/FancyGuitarist/GPH-3110/compare/v0.5.3...v0.5.4) (2025-03-16)
 
 
