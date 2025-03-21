@@ -133,10 +133,10 @@ class MainWindow(tk.Frame):
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
         self.power_meter = PowerMeter()
-        self.mask_path = home_directory / "pointing_mask.png"
-        self.plate_mask_cache = None
+        self.mask_path = home_directory / "Plate.png"
+        self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
-        self.X, self.Y = np.meshgrid(np.linspace(-1, 1, 400), np.linspace(-1, 1, 400))
+        self.X, self.Y = np.meshgrid(np.linspace(-1, 1, 400), np.linspace(-1, 1, 350))
         self.power_txt_box = ctk.CTkTextbox(
             self,
             width=200,
@@ -209,24 +209,29 @@ class MainWindow(tk.Frame):
             time.sleep(interval)
 
     def get_plate_mask_array(self):
+        x_dim = 240
+        y_dim = round(x_dim * 1.11)
+        pad_y = (350 - y_dim)
+        pad_x = (400 - x_dim) // 2
         if self.plate_mask_cache is None:
             mask_img = Image.open(self.mask_path)
-            mask_img = mask_img.resize((400, 400))
+            mask_img = mask_img.resize((x_dim, y_dim))
             mask_array = np.array(mask_img.convert("RGB"))
+            mask_array = np.pad(mask_array, ((pad_y // 3 * 2, pad_y // 3), (pad_x, pad_x), (0, 0)), mode="constant")
             self.plate_mask_cache = np.invert(mask_array.astype(np.bool))
         return self.plate_mask_cache
 
     def get_circular_mask_array(self):
-        mask = np.zeros((400, 400, 3), dtype=np.uint8)
-        radius = 100
-        rr, cc = disk((185, 200), radius)
-        mask[rr, cc, :] = 1
-        return mask
+        if self.circular_mask_cache is None:
+            self.circular_mask_cache = np.zeros((350, 400, 3), dtype=np.uint8)
+            rr, cc = disk((185, 200), 90)
+            self.circular_mask_cache[rr, cc, :] = 1
+        return self.circular_mask_cache
 
     def apply_masks_to_gradient(self, img_array):
         circular_mask_array = self.get_circular_mask_array()
         background = np.invert(circular_mask_array.astype(np.bool)) * UIColors.White.rgb_value
-        masked_array = img_array * self.get_plate_mask_array() * circular_mask_array + background
+        masked_array = (img_array * circular_mask_array + background) * self.get_plate_mask_array()
         return masked_array
 
     def update_gradient(self):
