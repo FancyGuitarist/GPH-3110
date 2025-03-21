@@ -213,13 +213,17 @@ class MainWindow(tk.Frame):
     def get_plate_mask_array(self):
         x_dim = 240
         y_dim = round(x_dim * 1.11)
-        pad_y = (350 - y_dim)
+        pad_y = 350 - y_dim
         pad_x = (400 - x_dim) // 2
         if self.plate_mask_cache is None:
             mask_img = Image.open(self.mask_path)
             mask_img = mask_img.resize((x_dim, y_dim))
             mask_array = np.array(mask_img.convert("RGB"))
-            mask_array = np.pad(mask_array, ((pad_y // 3 * 2, pad_y // 3), (pad_x, pad_x), (0, 0)), mode="constant")
+            mask_array = np.pad(
+                mask_array,
+                ((pad_y // 3 * 2, pad_y // 3), (pad_x, pad_x), (0, 0)),
+                mode="constant",
+            )
             self.plate_mask_cache = np.invert(mask_array.astype(np.bool))
         return self.plate_mask_cache
 
@@ -232,8 +236,12 @@ class MainWindow(tk.Frame):
 
     def apply_masks_to_gradient(self, img_array):
         circular_mask_array = self.get_circular_mask_array()
-        background = np.invert(circular_mask_array.astype(np.bool)) * UIColors.White.rgb_value
-        masked_array = (img_array * circular_mask_array + background) * self.get_plate_mask_array()
+        background = (
+            np.invert(circular_mask_array.astype(np.bool)) * UIColors.White.rgb_value
+        )
+        masked_array = (
+            img_array * circular_mask_array + background
+        ) * self.get_plate_mask_array()
         return masked_array
 
     def update_gradient(self):
