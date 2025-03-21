@@ -71,7 +71,9 @@ class UIColors(StrEnum):
 
     @property
     def rgb_value(self):
-        return np.array([self.red_value, self.green_value, self.blue_value]).astype(np.uint8)
+        return np.array([self.red_value, self.green_value, self.blue_value]).astype(
+            np.uint8
+        )
 
 
 class PowerMeterUI(tk.Tk):
