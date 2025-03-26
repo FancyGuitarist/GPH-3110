@@ -212,7 +212,7 @@ class MainWindow(tk.Frame):
 
     def get_plate_mask_array(self):
         x_dim = 240
-        y_dim = round(x_dim * 1.11)
+        y_dim = round(x_dim * 1.105)
         pad_y = 350 - y_dim
         pad_x = (400 - x_dim) // 2
         if self.plate_mask_cache is None:
@@ -221,7 +221,7 @@ class MainWindow(tk.Frame):
             mask_array = np.array(mask_img.convert("RGB"))
             mask_array = np.pad(
                 mask_array,
-                ((pad_y // 3 * 2, pad_y // 3), (pad_x, pad_x), (0, 0)),
+                ((pad_y // 3 * 2, pad_y // 3 + 1), (pad_x, pad_x), (0, 0)),
                 mode="constant",
             )
             self.plate_mask_cache = np.invert(mask_array.astype(np.bool))
@@ -294,8 +294,8 @@ class MainWindow(tk.Frame):
                 x + 5,
                 y + 5,
                 fill=str(current_color_hex),
-                outline="black",
-                width=1,
+                outline="Black",
+                width=2,
                 tags="overlay",
             )
 

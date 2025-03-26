@@ -65,7 +65,7 @@ jobs:
       - name: Build App
         run: |
           venv/Scripts/activate
-          pyinstaller --onefile powermeter_ui.py
+          pyinstaller --onefile --name "PowerMeterApp" --icon="ressources/QuebecWattAppLogo.ico" powermeter_ui.py
           
       - name: Create ZIP Archive on Windows
         run: |
