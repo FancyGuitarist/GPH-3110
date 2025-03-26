@@ -1,3 +1,10 @@
+## [0.8.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.7.1...v0.8.0) (2025-03-26)
+
+
+### Features
+
+* QuebecWatt Logo for apps ([84265d1](https://github.com/FancyGuitarist/GPH-3110/commit/84265d153a92149d22cad629f79f970be5190fbf))
+
 ## [0.7.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.7.0...v0.7.1) (2025-03-21)
 
 ## [0.7.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.6.3...v0.7.0) (2025-03-19)
