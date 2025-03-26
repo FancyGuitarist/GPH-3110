@@ -69,7 +69,7 @@ jobs:
           
       - name: Create ZIP Archive on Windows
         run: |
-          Compress-Archive dist/powermeter_ui.exe PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
+          Compress-Archive dist/PowerMeterApp.exe PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
         shell: pwsh
         
       - name: Upload Windows Artifact
