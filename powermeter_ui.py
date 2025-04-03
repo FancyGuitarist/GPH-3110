@@ -11,8 +11,16 @@ from PIL import Image, ImageTk
 from pathlib import Path
 from skimage.draw import disk
 
-home_directory = Path(__file__).parents[0]
+from tkinter import ttk
+import nidaqmx
+from nidaqmx.stream_readers import AnalogMultiChannelReader
+from nidaqmx.constants import AcquisitionType, LineGrouping, TerminalConfiguration
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+home_directory = Path(__file__).parents[0]
+SAMPLE_RATE = 10000
+SAMPLES_PER_READ = 100
 
 def setup_grid(self, rows: int, cols: int):
     """
@@ -100,7 +108,7 @@ class PowerMeterUI(tk.Tk):
         self.frames = {}
 
         # iterating through the different frame layouts
-        for F in (MainWindow, OtherWindow):
+        for F in (MainWindow, DAQReadingsWindow):
             frame = F(container, self)
             # Initializing frames for MainPage and Heat Map.
             self.frames[F] = frame
@@ -181,6 +189,20 @@ class MainWindow(tk.Frame):
             width=60,
             height=30,
         )
+        self.daq_display_button = ctk.CTkButton(
+            self,
+            text="Daq Display",
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
+            hover_color=UIColors.DarkGray,
+            corner_radius=5,
+            border_width=2,
+            font=self.label_font,
+            width=60,
+            height=30,
+            command=lambda: self.controller.show_frame(DAQReadingsWindow),
+        )
         self.canvas = tk.Canvas(
             self, width=400, height=350, bg=UIColors.White, highlightthickness=0
         )
@@ -192,6 +214,7 @@ class MainWindow(tk.Frame):
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
         self.wavelength_txt_box_label.place(x=300, y=135)
         self.acquisition_button.place(x=300, y=625)
+        self.daq_display_button.place(x=325, y=675)
         threading.Thread(target=self.update_values).start()
         threading.Thread(target=self.update_gradient).start()
 
@@ -300,15 +323,106 @@ class MainWindow(tk.Frame):
             )
 
 
-class OtherWindow(tk.Frame):
+class DAQReadingsWindow(tk.Frame):
     """
-    Other Window in the app just in case. For now, not used for anything.
+    Window for viewing the DAQ readings in real time.
     """
 
     def __init__(self, master, controller):
         super().__init__(master)
         self.master = master
         self.controller = controller
+        self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
+
+        self.show_main_window_button = ctk.CTkButton(
+            self,
+            text="Powermeter View",
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
+            hover_color=UIColors.DarkGray,
+            corner_radius=5,
+            border_width=2,
+            font=self.label_font,
+            width=60,
+            height=30,
+            command=lambda: self.controller.show_frame(MainWindow),
+        )
+
+        # Create the plot
+        self.fig, self.ax = plt.subplots()
+        self.ax.set_ylim(-1, 6)  # Adjust as needed
+        self.lines = [self.ax.plot([], [])[0] for _ in range(5)]
+        self.x_data = [[] for _ in range(5)]
+        self.y_data = [[] for _ in range(5)]
+
+        # Embed the plot into the Tkinter Frame
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.show_main_window_button.pack()
+
+        # Initialize DAQ
+        self.task = nidaqmx.Task()
+        self.task.ai_channels.add_ai_voltage_chan("Daddy/ai0:4", terminal_config=TerminalConfiguration.RSE)
+        self.task.timing.cfg_samp_clk_timing(rate=SAMPLE_RATE, sample_mode=AcquisitionType.FINITE,
+                                             samps_per_chan=SAMPLES_PER_READ)
+        self.reader = AnalogMultiChannelReader(self.task.in_stream)
+
+        self.do_task = nidaqmx.Task()
+        self.do_task.do_channels.add_do_chan(
+            "Daddy/port0/line0:3",
+            line_grouping=LineGrouping.CHAN_PER_LINE
+        )
+
+        self.data = np.zeros((5, SAMPLES_PER_READ))
+        self.start_time = time.time()
+        self.i = 0
+
+        # Start the update loop
+        self.update_plot()
+
+    def update_plot(self):
+        """
+        Function to update the DAQ readings and refresh the plot.
+        """
+        if self.task.is_task_done():
+            bits = [bool(int(b)) for b in format(self.i, '04b')]
+            self.do_task.write(bits)
+
+            if self.do_task.is_task_done():
+                self.reader.read_many_sample(self.data, number_of_samples_per_channel=SAMPLES_PER_READ)
+                averaged_data = np.mean(self.data, axis=1)
+
+                self.i += 1
+                if self.i > 15:
+                    self.i = 0
+
+                # Update plot data
+                for idx, plot_line in enumerate(self.lines):
+                    self.x_data[idx].append(time.time() - self.start_time)
+                    self.y_data[idx].append(averaged_data[idx])
+
+                    # Keep only the last 100 points
+                    if len(self.x_data[idx]) > 100:
+                        self.x_data[idx].pop(0)
+                        self.y_data[idx].pop(0)
+
+                    plot_line.set_xdata(self.x_data[idx])
+                    plot_line.set_ydata(self.y_data[idx])
+
+                self.ax.relim()
+                self.ax.autoscale_view()
+                self.canvas.draw()
+
+        # Schedule next update
+        self.after(10, self.update_plot)  # Update every 10ms
+
+    def close(self):
+        """
+        Clean up the DAQ tasks when closing the window.
+        """
+        self.task.close()
+        self.do_task.close()
 
 
 if __name__ == "__main__":
