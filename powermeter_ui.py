@@ -2,6 +2,7 @@ import tkinter as tk
 import customtkinter as ctk
 import numpy as np
 import time
+import datetime
 import threading
 from enum import StrEnum
 import matplotlib.cm as cm
@@ -10,6 +11,7 @@ from packages.functions import gaussian_2d, PowerMeter
 from PIL import Image, ImageTk
 from pathlib import Path
 from skimage.draw import disk
+import pandas as pd
 
 from tkinter import ttk
 import nidaqmx
@@ -349,17 +351,35 @@ class DAQReadingsWindow(tk.Frame):
             command=lambda: self.controller.show_frame(MainWindow),
         )
 
+        self.save_stored_data_button = ctk.CTkButton(
+            self,
+            text="Save Data",
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
+            hover_color=UIColors.DarkGray,
+            corner_radius=5,
+            border_width=2,
+            font=self.label_font,
+            width=60,
+            height=30,
+            command=lambda: self.save_current_data(),
+        )
+
         # Create the plot
         self.fig, self.ax = plt.subplots()
         self.ax.set_ylim(-1, 6)  # Adjust as needed
         self.lines = [self.ax.plot([], [])[0] for _ in range(5)]
         self.x_data = [[] for _ in range(5)]
         self.y_data = [[] for _ in range(5)]
+        self.x_data_store = [[] for _ in range(5)]
+        self.y_data_store = [[] for _ in range(5)]
 
         # Embed the plot into the Tkinter Frame
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         self.show_main_window_button.pack()
+        self.save_stored_data_button.pack()
 
         # Initialize DAQ
         self.task = nidaqmx.Task()
@@ -400,7 +420,9 @@ class DAQReadingsWindow(tk.Frame):
                 # Update plot data
                 for idx, plot_line in enumerate(self.lines):
                     self.x_data[idx].append(time.time() - self.start_time)
+                    self.x_data_store[idx].append(time.time() - self.start_time)
                     self.y_data[idx].append(averaged_data[idx])
+                    self.y_data_store[idx].append(averaged_data[idx])
 
                     # Keep only the last 100 points
                     if len(self.x_data[idx]) > 100:
@@ -416,6 +438,15 @@ class DAQReadingsWindow(tk.Frame):
 
         # Schedule next update
         self.after(10, self.update_plot)  # Update every 10ms
+
+    def save_current_data(self):
+        save_path = home_directory / "Saves"
+        save_path.mkdir(parents=True, exist_ok=True)
+        save_file_path = save_path / f"DAQ_readings_{datetime.datetime.now().date()}.csv"
+        data_dict = {"Time (s)": self.x_data_store, "Tension (V)": self.y_data_store}
+        df = pd.DataFrame(data_dict)
+        df.to_csv(save_file_path, index=False)
+
 
     def close(self):
         """
