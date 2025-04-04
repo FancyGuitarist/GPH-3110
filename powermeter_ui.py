@@ -130,6 +130,9 @@ class PowerMeterUI(tk.Tk):
         self.minsize(750, 750)
         self.maxsize(750, 750)
 
+    def get_wavelength(self):
+        return self.frames[MainWindow].wavelength_txt_box.get('1.0', tk.END)
+
 
 class MainWindow(tk.Frame):
     """
@@ -374,6 +377,7 @@ class DAQReadingsWindow(tk.Frame):
         self.y_data = [[] for _ in range(5)]
         self.x_data_store = [[] for _ in range(5)]
         self.y_data_store = [[] for _ in range(5)]
+        self.demux_bits = []
 
         # Embed the plot into the Tkinter Frame
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
@@ -416,6 +420,7 @@ class DAQReadingsWindow(tk.Frame):
                 self.i += 1
                 if self.i > 15:
                     self.i = 0
+                self.demux_bits.append(self.i)
 
                 # Update plot data
                 for idx, plot_line in enumerate(self.lines):
@@ -440,12 +445,18 @@ class DAQReadingsWindow(tk.Frame):
         self.after(10, self.update_plot)  # Update every 10ms
 
     def save_current_data(self):
-        save_path = home_directory / "Saves"
+        save_folder_path = home_directory / "Saves"
+        save_path = save_folder_path / f"QcWatt_{datetime.datetime.now().date()}_{int(self.controller.get_wavelength())}"
         save_path.mkdir(parents=True, exist_ok=True)
-        save_file_path = save_path / f"DAQ_readings_{datetime.datetime.now().date()}.csv"
-        data_dict = {"Time (s)": self.x_data_store, "Tension (V)": self.y_data_store}
-        df = pd.DataFrame(data_dict)
-        df.to_csv(save_file_path, index=False)
+        bits_array = np.array(self.demux_bits)
+        x_data_array = np.array(self.x_data_store).T
+        y_data_array = np.array(self.y_data_store).T
+        save_path_time = save_path / "time.npy"
+        save_path_tension = save_path / "tension.npy"
+        save_path_bits = save_path / "bits.npy"
+        np.save(save_path_time, x_data_array)
+        np.save(save_path_tension, y_data_array)
+        np.save(save_path_bits, bits_array)
 
 
     def close(self):
