@@ -89,10 +89,10 @@ class UIColors(StrEnum):
         )
 
 
-class PowerMeterUI(tk.Tk):
+class PowerMeterUI(ctk.CTk):
     def __init__(self, *args, **kwargs):
         # Initializing the Tkinter window that will hold the app
-        tk.Tk.__init__(self, *args, **kwargs)
+        ctk.CTk.__init__(self, *args, **kwargs)
         self.system_width, self.system_height = (
             self.winfo_screenwidth(),
             self.winfo_screenheight() - 70,
@@ -104,8 +104,9 @@ class PowerMeterUI(tk.Tk):
 
         # Variables to be shared between frames
 
+
         # creating a container
-        container = tk.Frame(self)
+        container = ctk.CTkFrame(self)
         container.pack(side="top", fill="both", expand=True)
 
         container.grid_rowconfigure(0, weight=1)
@@ -139,7 +140,7 @@ class PowerMeterUI(tk.Tk):
         return self.frames[MainWindow].wavelength_txt_box.get('1.0', tk.END)
 
 
-class MainWindow(tk.Frame):
+class MainWindow(ctk.CTkFrame):
     """
     Main window of the app, displays power (W), wavelength (nm) and heat map.
     """
@@ -148,7 +149,7 @@ class MainWindow(tk.Frame):
         super().__init__(master)
         self.master = master
         self.controller = controller
-        self.configure(bg=UIColors.White)
+        self.configure(fg_color=UIColors.White)
         self.setup_grid(6, 3)
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
@@ -213,10 +214,10 @@ class MainWindow(tk.Frame):
             height=30,
             command=lambda: self.controller.show_frame(DAQReadingsWindow),
         )
-        self.canvas = tk.Canvas(
+        self.canvas = ctk.CTkCanvas(
             self, width=400, height=350, bg=UIColors.White, highlightthickness=0
         )
-        self.canvas.place(x=175, y=250)
+        self.canvas.place(x=275, y=320)
         self.image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
 
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
@@ -333,7 +334,7 @@ class MainWindow(tk.Frame):
             )
 
 
-class DAQReadingsWindow(tk.Frame):
+class DAQReadingsWindow(ctk.CTkFrame):
     """
     Window for viewing the DAQ readings in real time.
     """

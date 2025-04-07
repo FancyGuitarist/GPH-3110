@@ -65,11 +65,11 @@ jobs:
       - name: Build App
         run: |
           venv/Scripts/activate
-          pyinstaller --onefile --name "PowerMeterApp" --icon="ressources/QuebecWattAppLogo.ico" powermeter_ui.py
+          pyinstaller PowerMeterApp.spec
           
       - name: Create ZIP Archive on Windows
         run: |
-          Compress-Archive dist/PowerMeterApp.exe PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
+          Compress-Archive dist/PowerMeterApp/PowerMeterApp.exe PowerMeterWindows${{ needs.get_version.outputs.version }}.zip
         shell: pwsh
         
       - name: Upload Windows Artifact
