@@ -20,6 +20,9 @@ from nidaqmx.constants import AcquisitionType, LineGrouping, TerminalConfigurati
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+# import ctypes
+# import platform
+
 home_directory = Path(__file__).parents[0]
 SAMPLE_RATE = 10000
 SAMPLES_PER_READ = 100
@@ -99,6 +102,8 @@ class PowerMeterUI(tk.Tk):
         self.minsize(self.system_width, self.system_height)
         self.maxsize(self.system_width, self.system_height)
 
+        # Variables to be shared between frames
+
         # creating a container
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand=True)
@@ -148,7 +153,7 @@ class MainWindow(tk.Frame):
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
         self.power_meter = PowerMeter()
-        self.mask_path = home_directory / "Plate.png"
+        self.mask_path = home_directory / "ressources" / "Plate.png"
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
         self.X, self.Y = np.meshgrid(np.linspace(-1, 1, 400), np.linspace(-1, 1, 350))
@@ -470,4 +475,11 @@ class DAQReadingsWindow(tk.Frame):
 if __name__ == "__main__":
     app = PowerMeterUI()
     app.title("Power Meter Interface v0.2.2")
+    # app.after(100, lambda: app.focus_force())
+    # if platform.system() == "Windows":
+    #     print("Ah shit, it's Windows")
+    #     app.attributes("-alpha", 1.0)
+    #     app.attributes("-transparentcolor", "")
+    #     hwnd = app.winfo_id()
+    #     ctypes.windll.user32.SetLayeredWindowAttributes(hwnd, 0, 255, 2)
     app.mainloop()
