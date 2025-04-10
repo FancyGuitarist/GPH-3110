@@ -12,20 +12,15 @@ from PIL import Image, ImageTk
 from pathlib import Path
 from skimage.draw import disk
 import pandas as pd
-
 from tkinter import ttk
-import nidaqmx
-from nidaqmx.stream_readers import AnalogMultiChannelReader
-from nidaqmx.constants import AcquisitionType, LineGrouping, TerminalConfiguration
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-# import ctypes
-# import platform
 
 home_directory = Path(__file__).parents[0]
 SAMPLE_RATE = 10000
 SAMPLES_PER_READ = 100
+
 
 def setup_grid(self, rows: int, cols: int):
     """
@@ -103,6 +98,7 @@ class PowerMeterUI(ctk.CTk):
         self.maxsize(self.system_width, self.system_height)
 
         # Variables to be shared between frames
+        self.power_meter = PowerMeter()
 
 
         # creating a container
@@ -153,7 +149,7 @@ class MainWindow(ctk.CTkFrame):
         self.setup_grid(6, 3)
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
-        self.power_meter = PowerMeter()
+        self.power_meter = self.controller.power_meter
         self.mask_path = home_directory / "ressources" / "Plate.png"
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
@@ -199,7 +195,23 @@ class MainWindow(ctk.CTkFrame):
             font=self.label_font,
             width=60,
             height=30,
+            command=self.power_meter.start_acquisition,
         )
+        self.stop_acquisition_button = ctk.CTkButton(
+            self,
+            text="Stop Acquisition",
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
+            hover_color=UIColors.DarkGray,
+            corner_radius=5,
+            border_width=2,
+            font=self.label_font,
+            width=60,
+            height=30,
+            command=self.power_meter.stop_acquisition,
+        )
+
         self.daq_display_button = ctk.CTkButton(
             self,
             text="Daq Display",
@@ -343,6 +355,7 @@ class DAQReadingsWindow(ctk.CTkFrame):
         super().__init__(master)
         self.master = master
         self.controller = controller
+        self.power_meter = self.controller.power_meter
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
 
         self.show_main_window_button = ctk.CTkButton(
@@ -381,8 +394,8 @@ class DAQReadingsWindow(ctk.CTkFrame):
         self.lines = [self.ax.plot([], [])[0] for _ in range(5)]
         self.x_data = [[] for _ in range(5)]
         self.y_data = [[] for _ in range(5)]
-        self.x_data_store = [[] for _ in range(5)]
-        self.y_data_store = [[] for _ in range(5)]
+        self.x_data_store = [[] for _ in range(5)]  # Will be moved to PowerMeter Class
+        self.y_data_store = [[] for _ in range(5)]  # Will be moved to PowerMeter Class
         self.demux_bits = []
 
         # Embed the plot into the Tkinter Frame
@@ -392,6 +405,9 @@ class DAQReadingsWindow(ctk.CTkFrame):
         self.save_stored_data_button.pack()
 
         # Initialize DAQ
+        """
+        All gonna be managed by PowerMeter Class later
+        """
         self.task = nidaqmx.Task()
         self.task.ai_channels.add_ai_voltage_chan("Daddy/ai0:4", terminal_config=TerminalConfiguration.RSE)
         self.task.timing.cfg_samp_clk_timing(rate=SAMPLE_RATE, sample_mode=AcquisitionType.FINITE,
@@ -407,6 +423,9 @@ class DAQReadingsWindow(ctk.CTkFrame):
         self.data = np.zeros((5, SAMPLES_PER_READ))
         self.start_time = time.time()
         self.i = 0
+        """
+        --------
+        """
 
         # Start the update loop
         self.update_plot()
