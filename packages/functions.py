@@ -213,6 +213,7 @@ class PowerMeter:
         self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
         self.i = 0
         self.time_cache, self.tension_cache, self.demux_cache = None, None, None
+        self.plot_time_cache, self.plot_tension_cache = None, None
         self.acquisition_on = False
 
     @property
@@ -265,7 +266,22 @@ class PowerMeter:
         if self.i > 15:
             self.i = 0
 
-    def fetch_daq_data(self):
+    def update_plot_data(self, plot_lines, averaged_data):
+        for idx, plot_line in enumerate(plot_lines):
+            self.plot_time_cache[idx].append(time.time() - self.start_time)
+            self.time_cache[idx].append(time.time() - self.start_time)
+            self.plot_time_cache[idx].append(averaged_data[idx])
+            self.tension_cache[idx].append(averaged_data[idx])
+
+            # Keep only the last 100 points
+            if len(self.plot_time_cache[idx]) > 100:
+                self.plot_time_cache[idx].pop(0)
+                self.plot_tension_cache[idx].pop(0)
+
+            plot_line.set_xdata(self.plot_time_cache[idx])
+            plot_line.set_ydata(self.plot_tension_cache[idx])
+
+    def fetch_daq_data(self, plot_lines):
         while self.acquisition_on:
             if self.task.is_task_done():
                 self.do_task.write(self.bits_list[self.i])
@@ -274,10 +290,12 @@ class PowerMeter:
                     self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
                     averaged_data = np.mean(self.data, axis=1)
 
+                    self.update_plot_data(plot_lines, averaged_data)
+
                     self.move_bit()
                     self.demux_cache.append(self.i)
-                    self.tension_cache.append(averaged_data)
-                    self.time_cache.append([(self.start_time - time.time()) * i / 5 for i in range(5)])
+                    # self.tension_cache.append(averaged_data)
+                    # self.time_cache.append([(self.start_time - time.time()) * i / 5 for i in range(5)])
 
     def stop_acquisition(self):
         self.task.close()
@@ -290,7 +308,7 @@ class PowerMeter:
         self.demux_cache = []
         print("Data reset")
 
-    def save_data(self, wavelength: float):
+    def save_current_data(self, wavelength: float):
         save_folder_path = home_directory / "Saves"
         save_path = save_folder_path / f"QcWatt_{datetime.datetime.now().date()}_{int(wavelength)}nm"
         save_path.mkdir(parents=True, exist_ok=True)

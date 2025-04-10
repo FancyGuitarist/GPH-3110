@@ -385,7 +385,7 @@ class DAQReadingsWindow(ctk.CTkFrame):
             font=self.label_font,
             width=60,
             height=30,
-            command=lambda: self.save_current_data(),
+            command=lambda: self.power_meter.save_current_data(),
         )
 
         # Create the plot
@@ -408,21 +408,21 @@ class DAQReadingsWindow(ctk.CTkFrame):
         """
         All gonna be managed by PowerMeter Class later
         """
-        self.task = nidaqmx.Task()
-        self.task.ai_channels.add_ai_voltage_chan("Daddy/ai0:4", terminal_config=TerminalConfiguration.RSE)
-        self.task.timing.cfg_samp_clk_timing(rate=SAMPLE_RATE, sample_mode=AcquisitionType.FINITE,
-                                             samps_per_chan=SAMPLES_PER_READ)
-        self.reader = AnalogMultiChannelReader(self.task.in_stream)
-
-        self.do_task = nidaqmx.Task()
-        self.do_task.do_channels.add_do_chan(
-            "Daddy/port0/line0:3",
-            line_grouping=LineGrouping.CHAN_PER_LINE
-        )
-
-        self.data = np.zeros((5, SAMPLES_PER_READ))
-        self.start_time = time.time()
-        self.i = 0
+        # self.task = nidaqmx.Task()
+        # self.task.ai_channels.add_ai_voltage_chan("Daddy/ai0:4", terminal_config=TerminalConfiguration.RSE)
+        # self.task.timing.cfg_samp_clk_timing(rate=SAMPLE_RATE, sample_mode=AcquisitionType.FINITE,
+        #                                      samps_per_chan=SAMPLES_PER_READ)
+        # self.reader = AnalogMultiChannelReader(self.task.in_stream)
+        #
+        # self.do_task = nidaqmx.Task()
+        # self.do_task.do_channels.add_do_chan(
+        #     "Daddy/port0/line0:3",
+        #     line_grouping=LineGrouping.CHAN_PER_LINE
+        # )
+        #
+        # self.data = np.zeros((5, SAMPLES_PER_READ))
+        # self.start_time = time.time()
+        # self.i = 0
         """
         --------
         """
@@ -434,37 +434,10 @@ class DAQReadingsWindow(ctk.CTkFrame):
         """
         Function to update the DAQ readings and refresh the plot.
         """
-        if self.task.is_task_done():
-            bits = [bool(int(b)) for b in format(self.i, '04b')]
-            self.do_task.write(bits)
-
-            if self.do_task.is_task_done():
-                self.reader.read_many_sample(self.data, number_of_samples_per_channel=SAMPLES_PER_READ)
-                averaged_data = np.mean(self.data, axis=1)
-
-                self.i += 1
-                if self.i > 15:
-                    self.i = 0
-                self.demux_bits.append(self.i)
-
-                # Update plot data
-                for idx, plot_line in enumerate(self.lines):
-                    self.x_data[idx].append(time.time() - self.start_time)
-                    self.x_data_store[idx].append(time.time() - self.start_time)
-                    self.y_data[idx].append(averaged_data[idx])
-                    self.y_data_store[idx].append(averaged_data[idx])
-
-                    # Keep only the last 100 points
-                    if len(self.x_data[idx]) > 100:
-                        self.x_data[idx].pop(0)
-                        self.y_data[idx].pop(0)
-
-                    plot_line.set_xdata(self.x_data[idx])
-                    plot_line.set_ydata(self.y_data[idx])
-
-                self.ax.relim()
-                self.ax.autoscale_view()
-                self.canvas.draw()
+        self.power_meter.fetch_dat_data()
+        self.ax.relim()
+        self.ax.autoscale_view()
+        self.canvas.draw()
 
         # Schedule next update
         self.after(10, self.update_plot)  # Update every 10ms
