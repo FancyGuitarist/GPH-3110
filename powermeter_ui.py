@@ -27,7 +27,6 @@ home_directory = Path(__file__).parents[0]
 SAMPLE_RATE = 10000
 SAMPLES_PER_READ = 100
 
-
 def setup_grid(self, rows: int, cols: int):
     """
     Sets up the grid layout to place the buttons automatically in the current frame.
@@ -105,6 +104,7 @@ class PowerMeterUI(ctk.CTk):
 
         # Variables to be shared between frames
 
+
         # creating a container
         container = ctk.CTkFrame(self)
         container.pack(side="top", fill="both", expand=True)
@@ -137,7 +137,7 @@ class PowerMeterUI(ctk.CTk):
         self.maxsize(750, 750)
 
     def get_wavelength(self):
-        return self.frames[MainWindow].wavelength_txt_box.get("1.0", tk.END)
+        return self.frames[MainWindow].wavelength_txt_box.get('1.0', tk.END)
 
 
 class MainWindow(ctk.CTkFrame):
@@ -393,19 +393,15 @@ class DAQReadingsWindow(ctk.CTkFrame):
 
         # Initialize DAQ
         self.task = nidaqmx.Task()
-        self.task.ai_channels.add_ai_voltage_chan(
-            "Daddy/ai0:4", terminal_config=TerminalConfiguration.RSE
-        )
-        self.task.timing.cfg_samp_clk_timing(
-            rate=SAMPLE_RATE,
-            sample_mode=AcquisitionType.FINITE,
-            samps_per_chan=SAMPLES_PER_READ,
-        )
+        self.task.ai_channels.add_ai_voltage_chan("Daddy/ai0:4", terminal_config=TerminalConfiguration.RSE)
+        self.task.timing.cfg_samp_clk_timing(rate=SAMPLE_RATE, sample_mode=AcquisitionType.FINITE,
+                                             samps_per_chan=SAMPLES_PER_READ)
         self.reader = AnalogMultiChannelReader(self.task.in_stream)
 
         self.do_task = nidaqmx.Task()
         self.do_task.do_channels.add_do_chan(
-            "Daddy/port0/line0:3", line_grouping=LineGrouping.CHAN_PER_LINE
+            "Daddy/port0/line0:3",
+            line_grouping=LineGrouping.CHAN_PER_LINE
         )
 
         self.data = np.zeros((5, SAMPLES_PER_READ))
@@ -420,13 +416,11 @@ class DAQReadingsWindow(ctk.CTkFrame):
         Function to update the DAQ readings and refresh the plot.
         """
         if self.task.is_task_done():
-            bits = [bool(int(b)) for b in format(self.i, "04b")]
+            bits = [bool(int(b)) for b in format(self.i, '04b')]
             self.do_task.write(bits)
 
             if self.do_task.is_task_done():
-                self.reader.read_many_sample(
-                    self.data, number_of_samples_per_channel=SAMPLES_PER_READ
-                )
+                self.reader.read_many_sample(self.data, number_of_samples_per_channel=SAMPLES_PER_READ)
                 averaged_data = np.mean(self.data, axis=1)
 
                 self.i += 1
@@ -458,10 +452,7 @@ class DAQReadingsWindow(ctk.CTkFrame):
 
     def save_current_data(self):
         save_folder_path = home_directory / "Saves"
-        save_path = (
-            save_folder_path
-            / f"QcWatt_{datetime.datetime.now().date()}_{int(self.controller.get_wavelength())}"
-        )
+        save_path = save_folder_path / f"QcWatt_{datetime.datetime.now().date()}_{int(self.controller.get_wavelength())}"
         save_path.mkdir(parents=True, exist_ok=True)
         bits_array = np.array(self.demux_bits)
         x_data_array = np.array(self.x_data_store).T
@@ -472,6 +463,7 @@ class DAQReadingsWindow(ctk.CTkFrame):
         np.save(save_path_time, x_data_array)
         np.save(save_path_tension, y_data_array)
         np.save(save_path_bits, bits_array)
+
 
     def close(self):
         """

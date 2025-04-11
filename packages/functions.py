@@ -5,6 +5,27 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 import scipy.optimize as opt
+import sys
+import time
+import datetime
+
+
+class AppModes(StrEnum):
+    """
+    Enum class to define the app modes.
+    """
+    open = "open"
+    demo = "demo"
+    locked = "locked"
+
+
+if sys.platform == "win32":
+    import nidaqmx
+    from nidaqmx.stream_readers import AnalogMultiChannelReader
+    from nidaqmx.constants import AcquisitionType, LineGrouping, TerminalConfiguration
+    app_mode = AppModes.open
+else:
+    app_mode = AppModes.locked
 
 transmission = 0.1
 home_directory = Path(__file__).parents[1]
@@ -175,15 +196,24 @@ class Glass:
 
 
 class PowerMeter:
-    def __init__(self):
+    def __init__(self, app_mode: AppModes = app_mode, samples_per_read: int = 100, sample_rate = 10000):
+        self.app_mode = app_mode
+        self.samples_per_read = samples_per_read
+        self.sample_rate = sample_rate
+
         self.glasses = [
             Glass(GlassType.NG11),
             Glass(GlassType.KG2),
             Glass(GlassType.VG9),
         ]
         self.thermistances = self.setup_thermistance_grid()
+        self.bits_list = self.setup_bits_list()
         self.laser_initial_guesses = [10, 0, 0, 1, 1, 290]
         self.laser_params = None
+        self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
+        self.i = 0
+        self.time_cache, self.tension_cache, self.demux_cache = [[] for _ in range(5)], [[] for _ in range(5)], [[] for _ in range(5)]
+        self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
 
     @property
     def x_coords(self):
@@ -204,6 +234,89 @@ class PowerMeter:
                 Thermistance((0.550, np.pi / 3 + i * np.pi / 3), f"port{i}")
             )
         return self.thermistances
+
+    def setup_bits_list(self):
+        self.bits_list = []
+        for i in range(16):
+            bits = [bool(int(b)) for b in format(i, '04b')]
+            self.bits_list.append(bits)
+        return self.bits_list
+
+    def start_acquisition(self):
+        self.task = nidaqmx.Task()
+        self.task.ai_channels.add_ai_voltage_chan("Daddy_1/ai0:4", terminal_config=TerminalConfiguration.RSE)
+        self.task.timing.cfg_samp_clk_timing(rate=self.sample_rate, sample_mode=AcquisitionType.FINITE,
+                                             samps_per_chan=self.samples_per_read)
+        self.reader = AnalogMultiChannelReader(self.task.in_stream)
+
+        self.do_task = nidaqmx.Task()
+        self.do_task.do_channels.add_do_chan(
+            "Daddy_1/port0/line0:3",
+            line_grouping=LineGrouping.CHAN_PER_LINE
+        )
+
+        self.data = np.zeros((5, self.samples_per_read))
+        self.start_time = time.time()
+        self.i = 0
+
+    def move_bit(self):
+        self.i += 1
+        if self.i > 15:
+            self.i = 0
+
+    def update_plot_data(self, plot_lines, averaged_data):
+        for idx, plot_line in enumerate(plot_lines):
+            self.plot_time_cache[idx].append(time.time() - self.start_time)
+            self.time_cache[idx].append(time.time() - self.start_time)
+            self.plot_tension_cache[idx].append(averaged_data[idx])
+            self.tension_cache[idx].append(averaged_data[idx])
+
+            # Keep only the last 100 points
+            if len(self.plot_time_cache[idx]) > 100:
+                self.plot_time_cache[idx].pop(0)
+                self.plot_tension_cache[idx].pop(0)
+
+            plot_line.set_xdata(self.plot_time_cache[idx])
+            plot_line.set_ydata(self.plot_tension_cache[idx])
+
+    def fetch_daq_data(self, plot_lines = None):
+        if self.task.is_task_done():
+            self.do_task.write(self.bits_list[self.i])
+
+            if self.do_task.is_task_done():
+                self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
+                averaged_data = np.mean(self.data, axis=1)
+
+                if plot_lines is not None:
+                    self.update_plot_data(plot_lines, averaged_data)
+
+                self.move_bit()
+                self.demux_cache.append(self.i)
+        return plot_lines
+
+    def stop_acquisition(self):
+        self.task.close()
+        self.do_task.close()
+
+    def reset_data(self):
+        self.time_cache = []
+        self.tension_cache = []
+        self.demux_cache = []
+        print("Data reset")
+
+    def save_current_data(self, wavelength: float = 900):
+        save_folder_path = home_directory / "Saves"
+        save_path = save_folder_path / f"QcWatt_{datetime.datetime.now().date()}_{int(wavelength)}nm"
+        save_path.mkdir(parents=True, exist_ok=True)
+        bits_array = np.array(self.demux_cache)
+        time_data_array = np.array(self.time_cache).T
+        tension_data_array = np.array(self.tension_cache).T
+        save_path_time = save_path / "time.npy"
+        save_path_tension = save_path / "tension.npy"
+        save_path_bits = save_path / "bits.npy"
+        np.save(save_path_time, time_data_array)
+        np.save(save_path_tension, tension_data_array)
+        np.save(save_path_bits, bits_array)
 
     def get_temperature_values(self):
         return [thermistance.get_temperature() for thermistance in self.thermistances]
