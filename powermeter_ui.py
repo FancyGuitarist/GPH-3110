@@ -32,7 +32,7 @@ def setup_grid(self, rows: int, cols: int):
         self.grid_columnconfigure(col, weight=1, uniform="col")
 
 
-tk.Frame.setup_grid = setup_grid
+ctk.CTkFrame.setup_grid = setup_grid
 
 
 def update_text_box(self, text, center=True):
@@ -99,6 +99,7 @@ class PowerMeterUI(ctk.CTk):
 
         # Variables to be shared between frames
         self.power_meter = PowerMeter()
+        self.updating_plot = False
 
 
         # creating a container
@@ -133,7 +134,10 @@ class PowerMeterUI(ctk.CTk):
         self.maxsize(750, 750)
         if frame == self.frames[DAQReadingsWindow]:
             print("Moving to DAQ Readings")
+            self.updating_plot = True
             frame.update_plot()
+        else:
+            self.updating_plot = False
 
     def get_wavelength(self):
         return self.frames[MainWindow].wavelength_txt_box.get('1.0', tk.END)
@@ -198,7 +202,7 @@ class MainWindow(ctk.CTkFrame):
             font=self.label_font,
             width=60,
             height=30,
-            command=self.power_meter.start_acquisition,
+            command=self.start_acquisition_daq,
         )
         self.stop_acquisition_button = ctk.CTkButton(
             self,
@@ -212,7 +216,8 @@ class MainWindow(ctk.CTkFrame):
             font=self.label_font,
             width=60,
             height=30,
-            command=self.power_meter.stop_acquisition,
+            state="disabled",
+            command=self.stop_acquisition_daq,
         )
 
         self.daq_display_button = ctk.CTkButton(
@@ -227,20 +232,22 @@ class MainWindow(ctk.CTkFrame):
             font=self.label_font,
             width=60,
             height=30,
+            state="disabled",
             command=lambda: self.controller.show_frame(DAQReadingsWindow),
         )
         self.canvas = ctk.CTkCanvas(
             self, width=400, height=350, bg=UIColors.White, highlightthickness=0
         )
-        self.canvas.place(x=275, y=320)
+        self.canvas.place(x=268, y=320)
         self.image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
 
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
         self.power_txt_box_label.place(x=335, y=12)
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
         self.wavelength_txt_box_label.place(x=300, y=135)
-        self.acquisition_button.place(x=300, y=625)
-        self.daq_display_button.place(x=325, y=675)
+        self.stop_acquisition_button.place(x=395, y=575)
+        self.acquisition_button.place(x=195, y=575)
+        self.daq_display_button.place(x=75, y=45)
         threading.Thread(target=self.update_values).start()
         threading.Thread(target=self.update_gradient).start()
 
@@ -348,6 +355,20 @@ class MainWindow(ctk.CTkFrame):
                 tags="overlay",
             )
 
+    def start_acquisition_daq(self):
+        self.power_meter.start_acquisition()
+        self.acquisition_button.configure(state="disabled")
+        self.stop_acquisition_button.configure(state="normal")
+        self.daq_display_button.configure(state="normal")
+
+    def stop_acquisition_daq(self):
+        self.controller.updating_plot = False
+        self.after(15)
+        self.power_meter.stop_acquisition()
+        self.acquisition_button.configure(state="normal")
+        self.stop_acquisition_button.configure(state="disabled")
+        self.daq_display_button.configure(state="disabled")
+
 
 class DAQReadingsWindow(ctk.CTkFrame):
     """
@@ -407,31 +428,6 @@ class DAQReadingsWindow(ctk.CTkFrame):
         self.show_main_window_button.pack()
         self.save_stored_data_button.pack()
 
-        # Initialize DAQ
-        """
-        All gonna be managed by PowerMeter Class later
-        """
-        # self.task = nidaqmx.Task()
-        # self.task.ai_channels.add_ai_voltage_chan("Daddy_1/ai0:4", terminal_config=TerminalConfiguration.RSE)
-        # self.task.timing.cfg_samp_clk_timing(rate=SAMPLE_RATE, sample_mode=AcquisitionType.FINITE,
-        #                                      samps_per_chan=SAMPLES_PER_READ)
-        # self.reader = AnalogMultiChannelReader(self.task.in_stream)
-        #
-        # self.do_task = nidaqmx.Task()
-        # self.do_task.do_channels.add_do_chan(
-        #     "Daddy/port0/line0:3",
-        #     line_grouping=LineGrouping.CHAN_PER_LINE
-        # )
-        #
-        # self.data = np.zeros((5, SAMPLES_PER_READ))
-        # self.start_time = time.time()
-        # self.i = 0
-        """
-        --------
-        """
-
-        # Start the update loop
-        # self.update_plot()
 
     def update_plot(self):
         """
@@ -443,7 +439,8 @@ class DAQReadingsWindow(ctk.CTkFrame):
         self.canvas.draw()
 
         # Schedule next update
-        self.after(1, self.update_plot)  # Update every 10ms
+        if self.controller.updating_plot:
+            self.after(10, self.update_plot)  # Update every 10ms
 
     def save_current_data(self):
         save_folder_path = home_directory / "Saves"
