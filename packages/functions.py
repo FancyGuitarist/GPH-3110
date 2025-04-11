@@ -14,6 +14,7 @@ class AppModes(StrEnum):
     """
     Enum class to define the app modes.
     """
+
     open = "open"
     demo = "demo"
     locked = "locked"
@@ -23,6 +24,7 @@ if sys.platform == "win32":
     import nidaqmx
     from nidaqmx.stream_readers import AnalogMultiChannelReader
     from nidaqmx.constants import AcquisitionType, LineGrouping, TerminalConfiguration
+
     app_mode = AppModes.open
 else:
     app_mode = AppModes.locked
@@ -196,7 +198,12 @@ class Glass:
 
 
 class PowerMeter:
-    def __init__(self, app_mode: AppModes = app_mode, samples_per_read: int = 100, sample_rate = 10000):
+    def __init__(
+        self,
+        app_mode: AppModes = app_mode,
+        samples_per_read: int = 100,
+        sample_rate=10000,
+    ):
         self.app_mode = app_mode
         self.samples_per_read = samples_per_read
         self.sample_rate = sample_rate
@@ -210,10 +217,23 @@ class PowerMeter:
         self.bits_list = self.setup_bits_list()
         self.laser_initial_guesses = [10, 0, 0, 1, 1, 290]
         self.laser_params = None
-        self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
+        self.task, self.reader, self.do_task, self.start_time, self.data = (
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
         self.i = 0
-        self.time_cache, self.tension_cache, self.demux_cache = [[] for _ in range(5)], [[] for _ in range(5)], [[] for _ in range(5)]
-        self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
+        self.time_cache, self.tension_cache, self.demux_cache = (
+            [[] for _ in range(5)],
+            [[] for _ in range(5)],
+            [[] for _ in range(5)],
+        )
+        self.plot_time_cache, self.plot_tension_cache = (
+            [[] for _ in range(5)],
+            [[] for _ in range(5)],
+        )
 
     @property
     def x_coords(self):
@@ -238,21 +258,25 @@ class PowerMeter:
     def setup_bits_list(self):
         self.bits_list = []
         for i in range(16):
-            bits = [bool(int(b)) for b in format(i, '04b')]
+            bits = [bool(int(b)) for b in format(i, "04b")]
             self.bits_list.append(bits)
         return self.bits_list
 
     def start_acquisition(self):
         self.task = nidaqmx.Task()
-        self.task.ai_channels.add_ai_voltage_chan("Daddy_1/ai0:4", terminal_config=TerminalConfiguration.RSE)
-        self.task.timing.cfg_samp_clk_timing(rate=self.sample_rate, sample_mode=AcquisitionType.FINITE,
-                                             samps_per_chan=self.samples_per_read)
+        self.task.ai_channels.add_ai_voltage_chan(
+            "Daddy_1/ai0:4", terminal_config=TerminalConfiguration.RSE
+        )
+        self.task.timing.cfg_samp_clk_timing(
+            rate=self.sample_rate,
+            sample_mode=AcquisitionType.FINITE,
+            samps_per_chan=self.samples_per_read,
+        )
         self.reader = AnalogMultiChannelReader(self.task.in_stream)
 
         self.do_task = nidaqmx.Task()
         self.do_task.do_channels.add_do_chan(
-            "Daddy_1/port0/line0:3",
-            line_grouping=LineGrouping.CHAN_PER_LINE
+            "Daddy_1/port0/line0:3", line_grouping=LineGrouping.CHAN_PER_LINE
         )
 
         self.data = np.zeros((5, self.samples_per_read))
@@ -279,12 +303,14 @@ class PowerMeter:
             plot_line.set_xdata(self.plot_time_cache[idx])
             plot_line.set_ydata(self.plot_tension_cache[idx])
 
-    def fetch_daq_data(self, plot_lines = None):
+    def fetch_daq_data(self, plot_lines=None):
         if self.task.is_task_done():
             self.do_task.write(self.bits_list[self.i])
 
             if self.do_task.is_task_done():
-                self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
+                self.reader.read_many_sample(
+                    self.data, number_of_samples_per_channel=self.samples_per_read
+                )
                 averaged_data = np.mean(self.data, axis=1)
 
                 if plot_lines is not None:
@@ -306,7 +332,10 @@ class PowerMeter:
 
     def save_current_data(self, wavelength: float = 900):
         save_folder_path = home_directory / "Saves"
-        save_path = save_folder_path / f"QcWatt_{datetime.datetime.now().date()}_{int(wavelength)}nm"
+        save_path = (
+            save_folder_path
+            / f"QcWatt_{datetime.datetime.now().date()}_{int(wavelength)}nm"
+        )
         save_path.mkdir(parents=True, exist_ok=True)
         bits_array = np.array(self.demux_cache)
         time_data_array = np.array(self.time_cache).T
