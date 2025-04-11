@@ -279,7 +279,7 @@ class PowerMeter:
             plot_line.set_xdata(self.plot_time_cache[idx])
             plot_line.set_ydata(self.plot_tension_cache[idx])
 
-    def fetch_daq_data(self, plot_lines):
+    def fetch_daq_data(self, plot_lines = None):
         if self.task.is_task_done():
             self.do_task.write(self.bits_list[self.i])
 
@@ -287,7 +287,8 @@ class PowerMeter:
                 self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
                 averaged_data = np.mean(self.data, axis=1)
 
-                self.update_plot_data(plot_lines, averaged_data)
+                if plot_lines is not None:
+                    self.update_plot_data(plot_lines, averaged_data)
 
                 self.move_bit()
                 self.demux_cache.append(self.i)

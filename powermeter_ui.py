@@ -190,7 +190,7 @@ class MainWindow(ctk.CTkFrame):
             font=self.label_font,
             text_color=UIColors.Black,
         )
-        self.acquisition_button = ctk.CTkButton(
+        self.start_acquisition_button = ctk.CTkButton(
             self,
             text="Start Acquisition",
             bg_color=UIColors.White,
@@ -236,6 +236,22 @@ class MainWindow(ctk.CTkFrame):
             command=self.power_meter.save_current_data,
         )
 
+        self.reset_data_button = ctk.CTkButton(
+            self,
+            text="Reset Data",
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
+            hover_color=UIColors.DarkGray,
+            corner_radius=5,
+            border_width=2,
+            font=self.label_font,
+            width=60,
+            height=30,
+            state="disabled",
+            command=self.reset_data,
+        )
+
         self.daq_display_button = ctk.CTkButton(
             self,
             text="Daq Display",
@@ -262,9 +278,10 @@ class MainWindow(ctk.CTkFrame):
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
         self.wavelength_txt_box_label.place(x=300, y=135)
         self.stop_acquisition_button.place(x=395, y=575)
-        self.acquisition_button.place(x=195, y=575)
+        self.start_acquisition_button.place(x=195, y=575)
         self.daq_display_button.place(x=75, y=45)
         self.save_data_button.place(x=325, y=625)
+        self.reset_data_button.place(x=322, y=675)
         threading.Thread(target=self.update_values).start()
         threading.Thread(target=self.update_gradient).start()
 
@@ -374,19 +391,27 @@ class MainWindow(ctk.CTkFrame):
 
     def start_acquisition_daq(self):
         self.power_meter.start_acquisition()
-        self.acquisition_button.configure(state="disabled")
+        self.start_acquisition_button.configure(state="disabled")
         self.stop_acquisition_button.configure(state="normal")
         self.daq_display_button.configure(state="normal")
         self.save_data_button.configure(state="disabled")
+        self.reset_data_button.configure(state="disabled")
 
     def stop_acquisition_daq(self):
         self.controller.updating_plot = False
         self.after(11)
         self.power_meter.stop_acquisition()
-        self.acquisition_button.configure(state="normal")
+        self.start_acquisition_button.configure(state="normal")
         self.stop_acquisition_button.configure(state="disabled")
         self.daq_display_button.configure(state="disabled")
         self.save_data_button.configure(state="normal")
+        self.reset_data_button.configure(state="normal")
+
+    def reset_data(self):
+        self.power_meter.reset_data()
+        self.stop_acquisition_button.configure(state="disabled")
+        self.start_acquisition_button.configure(state="normal")
+        self.save_data_button.configure(state="disabled")
 
 
 class DAQReadingsWindow(ctk.CTkFrame):
@@ -416,36 +441,15 @@ class DAQReadingsWindow(ctk.CTkFrame):
             command=lambda: self.controller.show_frame(MainWindow),
         )
 
-        self.save_stored_data_button = ctk.CTkButton(
-            self,
-            text="Save Data",
-            bg_color=UIColors.White,
-            fg_color=UIColors.LightGray,
-            text_color=UIColors.Black,
-            hover_color=UIColors.DarkGray,
-            corner_radius=5,
-            border_width=2,
-            font=self.label_font,
-            width=60,
-            height=30,
-            command=lambda: self.power_meter.save_current_data(),
-        )
-
         # Create the plot
         self.fig, self.ax = plt.subplots()
         self.ax.set_ylim(-1, 6)  # Adjust as needed
         self.lines = [self.ax.plot([], [])[0] for _ in range(5)]
-        self.x_data = [[] for _ in range(5)]
-        self.y_data = [[] for _ in range(5)]
-        self.x_data_store = [[] for _ in range(5)]  # Will be moved to PowerMeter Class
-        self.y_data_store = [[] for _ in range(5)]  # Will be moved to PowerMeter Class
-        self.demux_bits = []
 
         # Embed the plot into the Tkinter Frame
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         self.show_main_window_button.pack()
-        self.save_stored_data_button.pack()
 
 
     def update_plot(self):
@@ -461,37 +465,8 @@ class DAQReadingsWindow(ctk.CTkFrame):
         if self.controller.updating_plot:
             self.after(10, self.update_plot)  # Update every 10ms
 
-    def save_current_data(self):
-        save_folder_path = home_directory / "Saves"
-        save_path = save_folder_path / f"QcWatt_{datetime.datetime.now().date()}_{int(self.controller.get_wavelength())}"
-        save_path.mkdir(parents=True, exist_ok=True)
-        bits_array = np.array(self.demux_bits)
-        x_data_array = np.array(self.x_data_store).T
-        y_data_array = np.array(self.y_data_store).T
-        save_path_time = save_path / "time.npy"
-        save_path_tension = save_path / "tension.npy"
-        save_path_bits = save_path / "bits.npy"
-        np.save(save_path_time, x_data_array)
-        np.save(save_path_tension, y_data_array)
-        np.save(save_path_bits, bits_array)
-
-
-    def close(self):
-        """
-        Clean up the DAQ tasks when closing the window.
-        """
-        self.task.close()
-        self.do_task.close()
-
 
 if __name__ == "__main__":
     app = PowerMeterUI()
     app.title("Power Meter Interface v0.2.2")
-    # app.after(100, lambda: app.focus_force())
-    # if platform.system() == "Windows":
-    #     print("Ah shit, it's Windows")
-    #     app.attributes("-alpha", 1.0)
-    #     app.attributes("-transparentcolor", "")
-    #     hwnd = app.winfo_id()
-    #     ctypes.windll.user32.SetLayeredWindowAttributes(hwnd, 0, 255, 2)
     app.mainloop()
