@@ -212,8 +212,8 @@ class PowerMeter:
         self.laser_params = None
         self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
         self.i = 0
-        self.time_cache, self.tension_cache, self.demux_cache = None, None, None
-        self.plot_time_cache, self.plot_tension_cache = None, None
+        self.time_cache, self.tension_cache, self.demux_cache = [[] for _ in range(5)], [[] for _ in range(5)], [[] for _ in range(5)]
+        self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
         self.acquisition_on = False
 
     @property
@@ -245,14 +245,14 @@ class PowerMeter:
 
     def start_acquisition(self):
         self.task = nidaqmx.Task()
-        self.task.ai_channels.add_ai_voltage_chan("Daddy/ai0:4", terminal_config=TerminalConfiguration.RSE)
+        self.task.ai_channels.add_ai_voltage_chan("Daddy_1/ai0:4", terminal_config=TerminalConfiguration.RSE)
         self.task.timing.cfg_samp_clk_timing(rate=self.sample_rate, sample_mode=AcquisitionType.FINITE,
                                              samps_per_chan=self.samples_per_read)
         self.reader = AnalogMultiChannelReader(self.task.in_stream)
 
         self.do_task = nidaqmx.Task()
         self.do_task.do_channels.add_do_chan(
-            "Daddy/port0/line0:3",
+            "Daddy_1/port0/line0:3",
             line_grouping=LineGrouping.CHAN_PER_LINE
         )
 
@@ -270,7 +270,7 @@ class PowerMeter:
         for idx, plot_line in enumerate(plot_lines):
             self.plot_time_cache[idx].append(time.time() - self.start_time)
             self.time_cache[idx].append(time.time() - self.start_time)
-            self.plot_time_cache[idx].append(averaged_data[idx])
+            self.plot_tension_cache[idx].append(averaged_data[idx])
             self.tension_cache[idx].append(averaged_data[idx])
 
             # Keep only the last 100 points
@@ -282,20 +282,20 @@ class PowerMeter:
             plot_line.set_ydata(self.plot_tension_cache[idx])
 
     def fetch_daq_data(self, plot_lines):
-        while self.acquisition_on:
-            if self.task.is_task_done():
-                self.do_task.write(self.bits_list[self.i])
+        if self.task.is_task_done():
+            self.do_task.write(self.bits_list[self.i])
 
-                if self.do_task.is_task_done():
-                    self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
-                    averaged_data = np.mean(self.data, axis=1)
+            if self.do_task.is_task_done():
+                self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
+                averaged_data = np.mean(self.data, axis=1)
 
-                    self.update_plot_data(plot_lines, averaged_data)
+                self.update_plot_data(plot_lines, averaged_data)
 
-                    self.move_bit()
-                    self.demux_cache.append(self.i)
-                    # self.tension_cache.append(averaged_data)
-                    # self.time_cache.append([(self.start_time - time.time()) * i / 5 for i in range(5)])
+                self.move_bit()
+                self.demux_cache.append(self.i)
+                # self.tension_cache.append(averaged_data)
+                # self.time_cache.append([(self.start_time - time.time()) * i / 5 for i in range(5)])
+        return plot_lines
 
     def stop_acquisition(self):
         self.task.close()

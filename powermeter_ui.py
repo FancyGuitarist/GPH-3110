@@ -131,6 +131,9 @@ class PowerMeterUI(ctk.CTk):
         self.geometry("750x750")
         self.minsize(750, 750)
         self.maxsize(750, 750)
+        if frame == self.frames[DAQReadingsWindow]:
+            print("Moving to DAQ Readings")
+            frame.update_plot()
 
     def get_wavelength(self):
         return self.frames[MainWindow].wavelength_txt_box.get('1.0', tk.END)
@@ -409,7 +412,7 @@ class DAQReadingsWindow(ctk.CTkFrame):
         All gonna be managed by PowerMeter Class later
         """
         # self.task = nidaqmx.Task()
-        # self.task.ai_channels.add_ai_voltage_chan("Daddy/ai0:4", terminal_config=TerminalConfiguration.RSE)
+        # self.task.ai_channels.add_ai_voltage_chan("Daddy_1/ai0:4", terminal_config=TerminalConfiguration.RSE)
         # self.task.timing.cfg_samp_clk_timing(rate=SAMPLE_RATE, sample_mode=AcquisitionType.FINITE,
         #                                      samps_per_chan=SAMPLES_PER_READ)
         # self.reader = AnalogMultiChannelReader(self.task.in_stream)
@@ -428,19 +431,19 @@ class DAQReadingsWindow(ctk.CTkFrame):
         """
 
         # Start the update loop
-        self.update_plot()
+        # self.update_plot()
 
     def update_plot(self):
         """
         Function to update the DAQ readings and refresh the plot.
         """
-        self.power_meter.fetch_dat_data()
+        self.lines = self.power_meter.fetch_daq_data(self.lines)
         self.ax.relim()
         self.ax.autoscale_view()
         self.canvas.draw()
 
         # Schedule next update
-        self.after(10, self.update_plot)  # Update every 10ms
+        self.after(1, self.update_plot)  # Update every 10ms
 
     def save_current_data(self):
         save_folder_path = home_directory / "Saves"
