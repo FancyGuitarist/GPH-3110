@@ -220,6 +220,22 @@ class MainWindow(ctk.CTkFrame):
             command=self.stop_acquisition_daq,
         )
 
+        self.save_data_button = ctk.CTkButton(
+            self,
+            text="Save Data",
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
+            hover_color=UIColors.DarkGray,
+            corner_radius=5,
+            border_width=2,
+            font=self.label_font,
+            width=60,
+            height=30,
+            state="disabled",
+            command=self.power_meter.save_current_data,
+        )
+
         self.daq_display_button = ctk.CTkButton(
             self,
             text="Daq Display",
@@ -248,6 +264,7 @@ class MainWindow(ctk.CTkFrame):
         self.stop_acquisition_button.place(x=395, y=575)
         self.acquisition_button.place(x=195, y=575)
         self.daq_display_button.place(x=75, y=45)
+        self.save_data_button.place(x=325, y=625)
         threading.Thread(target=self.update_values).start()
         threading.Thread(target=self.update_gradient).start()
 
@@ -360,14 +377,16 @@ class MainWindow(ctk.CTkFrame):
         self.acquisition_button.configure(state="disabled")
         self.stop_acquisition_button.configure(state="normal")
         self.daq_display_button.configure(state="normal")
+        self.save_data_button.configure(state="disabled")
 
     def stop_acquisition_daq(self):
         self.controller.updating_plot = False
-        self.after(15)
+        self.after(11)
         self.power_meter.stop_acquisition()
         self.acquisition_button.configure(state="normal")
         self.stop_acquisition_button.configure(state="disabled")
         self.daq_display_button.configure(state="disabled")
+        self.save_data_button.configure(state="normal")
 
 
 class DAQReadingsWindow(ctk.CTkFrame):

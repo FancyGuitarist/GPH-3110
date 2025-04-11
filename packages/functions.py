@@ -214,7 +214,6 @@ class PowerMeter:
         self.i = 0
         self.time_cache, self.tension_cache, self.demux_cache = [[] for _ in range(5)], [[] for _ in range(5)], [[] for _ in range(5)]
         self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
-        self.acquisition_on = False
 
     @property
     def x_coords(self):
@@ -259,7 +258,6 @@ class PowerMeter:
         self.data = np.zeros((5, self.samples_per_read))
         self.start_time = time.time()
         self.i = 0
-        self.acquisition_on = True
 
     def move_bit(self):
         self.i += 1
@@ -293,14 +291,11 @@ class PowerMeter:
 
                 self.move_bit()
                 self.demux_cache.append(self.i)
-                # self.tension_cache.append(averaged_data)
-                # self.time_cache.append([(self.start_time - time.time()) * i / 5 for i in range(5)])
         return plot_lines
 
     def stop_acquisition(self):
         self.task.close()
         self.do_task.close()
-        self.acquisition_on = False
 
     def reset_data(self):
         self.time_cache = []
@@ -308,7 +303,7 @@ class PowerMeter:
         self.demux_cache = []
         print("Data reset")
 
-    def save_current_data(self, wavelength: float):
+    def save_current_data(self, wavelength: float = 900):
         save_folder_path = home_directory / "Saves"
         save_path = save_folder_path / f"QcWatt_{datetime.datetime.now().date()}_{int(wavelength)}nm"
         save_path.mkdir(parents=True, exist_ok=True)
