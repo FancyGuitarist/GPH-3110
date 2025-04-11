@@ -2,17 +2,13 @@ import tkinter as tk
 import customtkinter as ctk
 import numpy as np
 import time
-import datetime
 import threading
 from enum import StrEnum
-import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from packages.functions import gaussian_2d, PowerMeter
 from PIL import Image, ImageTk
 from pathlib import Path
 from skimage.draw import disk
-import pandas as pd
-from tkinter import ttk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -340,7 +336,7 @@ class MainWindow(ctk.CTkFrame):
 
         # Normalize the data to fit a colormap
         norm = mcolors.Normalize(vmin=np.min(Z), vmax=np.max(Z))
-        colormap = cm.get_cmap("coolwarm")
+        colormap = plt.get_cmap("coolwarm")
 
         # Convert the Gaussian values to RGB colors
         img_array = (colormap(norm(Z))[:, :, :3] * 255).astype(np.uint8)
