@@ -96,6 +96,11 @@ class PowerMeterUI(ctk.CTk):
         # Variables to be shared between frames
         self.power_meter = PowerMeter()
         self.updating_plot = False
+        self.reading_daq = False
+
+        self.fig, self.ax = plt.subplots()
+        self.ax.set_ylim(-1, 6)  # Adjust as needed
+        self.lines = [self.ax.plot([], [])[0] for _ in range(5)]
 
 
         # creating a container
@@ -157,6 +162,7 @@ class MainWindow(ctk.CTkFrame):
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
         self.X, self.Y = np.meshgrid(np.linspace(-1, 1, 400), np.linspace(-1, 1, 350))
+        self.activation_count = 0
         self.power_txt_box = ctk.CTkTextbox(
             self,
             width=200,
@@ -386,15 +392,24 @@ class MainWindow(ctk.CTkFrame):
             )
 
     def start_acquisition_daq(self):
-        self.power_meter.start_acquisition()
+        try:
+            self.power_meter.start_acquisition()
+        except RuntimeError:
+            print("No Device Detected")
+            return
+        if self.activation_count == 0:
+            self.read_daq_data()
+            self.activation_count += 1
         self.start_acquisition_button.configure(state="disabled")
         self.stop_acquisition_button.configure(state="normal")
         self.daq_display_button.configure(state="normal")
         self.save_data_button.configure(state="disabled")
         self.reset_data_button.configure(state="disabled")
+        self.controller.reading_daq = True
 
     def stop_acquisition_daq(self):
         self.controller.updating_plot = False
+        self.controller.reading_daq = False
         self.after(11)
         self.power_meter.stop_acquisition()
         self.start_acquisition_button.configure(state="normal")
@@ -408,6 +423,13 @@ class MainWindow(ctk.CTkFrame):
         self.stop_acquisition_button.configure(state="disabled")
         self.start_acquisition_button.configure(state="normal")
         self.save_data_button.configure(state="disabled")
+
+    def read_daq_data(self):
+        if self.controller.reading_daq:
+            self.controller.lines = self.power_meter.fetch_daq_data(self.controller.lines)
+            if self.controller.updating_plot:
+                self.controller.frames[DAQReadingsWindow].update_plot()
+        self.after(10, self.read_daq_data)
 
 
 class DAQReadingsWindow(ctk.CTkFrame):
@@ -438,9 +460,8 @@ class DAQReadingsWindow(ctk.CTkFrame):
         )
 
         # Create the plot
-        self.fig, self.ax = plt.subplots()
-        self.ax.set_ylim(-1, 6)  # Adjust as needed
-        self.lines = [self.ax.plot([], [])[0] for _ in range(5)]
+        self.fig, self.ax = self.controller.fig, self.controller.ax
+        self.lines = self.controller.lines
 
         # Embed the plot into the Tkinter Frame
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
@@ -452,14 +473,9 @@ class DAQReadingsWindow(ctk.CTkFrame):
         """
         Function to update the DAQ readings and refresh the plot.
         """
-        self.lines = self.power_meter.fetch_daq_data(self.lines)
         self.ax.relim()
         self.ax.autoscale_view()
         self.canvas.draw()
-
-        # Schedule next update
-        if self.controller.updating_plot:
-            self.after(10, self.update_plot)  # Update every 10ms
 
 
 if __name__ == "__main__":
