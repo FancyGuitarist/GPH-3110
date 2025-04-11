@@ -1,3 +1,11 @@
+## [0.10.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.9.2...v0.10.0) (2025-04-11)
+
+
+### Features
+
+* reset button ([4cb1d5a](https://github.com/FancyGuitarist/GPH-3110/commit/4cb1d5ac5d4e3085eaaf5a376ea3a04389004514))
+* save button in UI ([b2403b2](https://github.com/FancyGuitarist/GPH-3110/commit/b2403b21f85afb3be3112a31837eaceb6beba4fe))
+
 ## [0.9.2](https://github.com/FancyGuitarist/GPH-3110/compare/v0.9.1...v0.9.2) (2025-04-07)
 
 ## [0.9.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.9.0...v0.9.1) (2025-04-07)
