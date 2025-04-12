@@ -375,7 +375,9 @@ class PowerMeter:
 
     def save_current_data(self, wavelength: float = 900):
         save_folder_path = home_directory / "Saves"
-        save_path = save_folder_path / f"QcWatt_{datetime.datetime.now().date()}_{int(wavelength)}nm"
+        current_time = str(datetime.datetime.now())
+        formatted_name = current_time.replace(" ", "_").replace(":", "_")[:-7]
+        save_path = save_folder_path / f"QcWatt_{formatted_name}"
         save_path.mkdir(parents=True, exist_ok=True)
         bits_array = np.array(self.demux_cache)
         time_data_array = np.array(self.time_cache).T
