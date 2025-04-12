@@ -1,5 +1,5 @@
 import unittest
-from packages.functions import PowerMeter
+from packages.powermeter_functions import PowerMeter
 import numpy as np
 
 

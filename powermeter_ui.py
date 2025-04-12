@@ -5,7 +5,7 @@ import time
 import threading
 from enum import StrEnum
 import matplotlib.colors as mcolors
-from packages.functions import gaussian_2d, PowerMeter
+from packages.powermeter_functions import gaussian_2d, PowerMeter
 from PIL import Image, ImageTk
 from pathlib import Path
 from skimage.draw import disk

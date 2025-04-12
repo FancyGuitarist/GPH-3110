@@ -103,7 +103,6 @@ class Thermistance:
         self.position = position
         self.port = port
         self.steinhart_coeffs = (1.844e-3, -3.577e-06, 2.7612e-05, -1.0234e-06)
-        self.demo_mode = True
         self.data = None
 
     def __repr__(self):

@@ -9,7 +9,7 @@ DATA_FILES = [
             "ressources/QuebecWattAppLogo.icns",
         ],
     ),
-    ("packages", ["packages/functions.py"]),
+    ("packages", ["packages/powermeter_functions.py"]),
 ]
 
 OPTIONS = {
