@@ -11,6 +11,9 @@ class DAQLoader:
         self.saves_path = self.home_dir / 'Saves' if not test_mode else self.home_dir / 'Saves' / 'test_saves'
         self.required_stems = ["bits", "tension", "time"]
         self.save_folders = self.get_save_folders()
+        self.combobox_options = self.get_combobox_options()
+        self.load_cache = None
+        self.load_index = 0
         self.test_mode = test_mode
 
     def check_if_valid_folder(self, folder: Path):
@@ -25,14 +28,36 @@ class DAQLoader:
                 self.save_folders.append(folder)
         return self.save_folders
 
+    def get_combobox_options(self):
+        self.combobox_options = []
+        for folder in self.save_folders:
+            self.combobox_options.append(str(folder.name).replace("QcWatt_", ""))
+        return self.combobox_options
+
     def load_save(self, index: int):
-        if index > len(self.save_folders) or index < 0:
-            raise IndexError("Wrong index, current list is {} long".format(self.save_folders))
-        folder = self.save_folders[index]
-        time = np.load(folder / 'time.npy')
-        tension = np.load(folder / 'tension.npy')
-        bits = np.load(folder / 'bits.npy')
-        return time, tension, bits
+        if self.load_cache is None or self.load_cache[0] != index:
+            if index > len(self.save_folders) or index < 0:
+                raise IndexError("Wrong index, current list is {} long".format(self.save_folders))
+            folder = self.save_folders[index]
+            time = np.load(folder / 'time.npy')
+            tension = np.load(folder / 'tension.npy')
+            bits = np.load(folder / 'bits.npy')
+            self.load_cache = (index, time, tension, bits)
+        return self.load_cache
+
+    def load_save_for_ui(self, index: int):
+        _, time, tension, bits = self.load_save(index)
+        current_time = time[:self.load_index, :]
+        current_tension = tension[:self.load_index, :]
+        current_bit = bits[:self.load_index]
+        if self.load_index == bits.shape[0] - 1:
+            self.load_index = 0
+        elif 16 > bits.shape[0] - self.load_index:
+            self.load_index = bits.shape[0] - 1
+        else:
+            self.load_index += 16
+        return current_time, current_tension, current_bit
+
 
 
 

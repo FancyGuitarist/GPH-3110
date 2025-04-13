@@ -11,6 +11,13 @@ from pathlib import Path
 from skimage.draw import disk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import ctypes
+
+
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)  # Enable DPI awareness
+except Exception:
+    pass
 
 
 home_directory = Path(__file__).parents[0]
@@ -101,6 +108,7 @@ class PowerMeterUI(ctk.CTk):
         self.fig, self.ax = plt.subplots()
         self.ax.set_ylim(-1, 6)  # Adjust as needed
         self.lines = [self.ax.plot([], [])[0] for _ in range(5)]
+        self.app_dims = (750, 750)
 
 
         # creating a container
@@ -130,7 +138,7 @@ class PowerMeterUI(ctk.CTk):
         """
         frame = self.frames[window]
         frame.tkraise()
-        self.geometry("750x750")
+        self.geometry(f"{self.app_dims[0]}x{self.app_dims[1]}")
         self.minsize(750, 750)
         self.maxsize(750, 750)
         if frame == self.frames[DAQReadingsWindow]:
@@ -142,6 +150,12 @@ class PowerMeterUI(ctk.CTk):
 
     def get_wavelength(self):
         return self.frames[MainWindow].wavelength_txt_box.get('1.0', tk.END)
+
+    def relx_pos(self, absx_pos):
+        return absx_pos / self.app_dims[0]
+
+    def rely_pos(self, absy_pos):
+        return absy_pos / self.app_dims[1]
 
 
 class MainWindow(ctk.CTkFrame):
@@ -272,18 +286,18 @@ class MainWindow(ctk.CTkFrame):
         self.canvas = ctk.CTkCanvas(
             self, width=400, height=350, bg=UIColors.White, highlightthickness=0
         )
-        self.canvas.place(x=268, y=320)
-        self.image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
+        self.canvas.place(relx=self.controller.relx_pos(213), rely=self.controller.rely_pos(250), anchor=ctk.NW)
+        self.image_id = self.canvas.create_image(0, 0, anchor=ctk.NW)
 
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
-        self.power_txt_box_label.place(x=335, y=12)
+        self.power_txt_box_label.place(relx=self.controller.relx_pos(335), rely=self.controller.rely_pos(12), anchor=ctk.NW)
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
-        self.wavelength_txt_box_label.place(x=300, y=135)
-        self.stop_acquisition_button.place(x=395, y=575)
-        self.start_acquisition_button.place(x=195, y=575)
-        self.daq_display_button.place(x=75, y=45)
-        self.save_data_button.place(x=325, y=625)
-        self.reset_data_button.place(x=322, y=675)
+        self.wavelength_txt_box_label.place(relx=self.controller.relx_pos(300), rely=self.controller.rely_pos(135), anchor=ctk.NW)
+        self.stop_acquisition_button.place(relx=self.controller.relx_pos(395), rely=self.controller.rely_pos(575), anchor=ctk.NW)
+        self.start_acquisition_button.place(relx=self.controller.relx_pos(195), rely=self.controller.rely_pos(575), anchor=ctk.NW)
+        self.daq_display_button.place(relx=self.controller.relx_pos(75), rely=self.controller.rely_pos(45), anchor=ctk.NW)
+        self.save_data_button.place(relx=self.controller.relx_pos(325), rely=self.controller.rely_pos(625), anchor=ctk.NW)
+        self.reset_data_button.place(relx=self.controller.relx_pos(322), rely=self.controller.rely_pos(675), anchor=ctk.NW)
         threading.Thread(target=self.update_values).start()
         threading.Thread(target=self.update_gradient).start()
 

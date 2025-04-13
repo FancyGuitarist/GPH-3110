@@ -9,6 +9,7 @@ import sys
 import time
 import datetime
 import re
+from packages.daq_data_loader import DAQLoader
 
 
 class AppModes(StrEnum):
@@ -233,8 +234,7 @@ class Glass:
 
 
 class PowerMeter:
-    def __init__(self, app_mode: AppModes = app_mode, samples_per_read: int = 100, sample_rate=10000):
-        self.app_mode = app_mode
+    def __init__(self, samples_per_read: int = 100, sample_rate=10000):
         self.samples_per_read = samples_per_read
         self.sample_rate = sample_rate
 
@@ -252,6 +252,7 @@ class PowerMeter:
         self.time_cache, self.tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
         self.demux_cache = []
         self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
+        self.loader = DAQLoader()
 
     @property
     def x_coords(self):
