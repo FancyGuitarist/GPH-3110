@@ -2,7 +2,6 @@ from enum import StrEnum
 import pandas as pd
 from pathlib import Path
 import numpy as np
-import random
 import matplotlib.pyplot as plt
 import scipy.optimize as opt
 import sys
@@ -35,12 +34,11 @@ transmission = 0.1
 home_directory = Path(__file__).parents[1]
 
 
-def gaussian_2d(coords: tuple, A, x0, y0, sigma_x, sigma_y, T_0):
+def gaussian_2d(coords: tuple, A, x0, y0, sigma_x, sigma_y):
     x, y = coords
     return (
             A
             * np.exp(-((x - x0) ** 2 / (2 * sigma_x ** 2) + (y - y0) ** 2 / (2 * sigma_y ** 2)))
-            + T_0
     )
 
 
@@ -104,6 +102,7 @@ class Thermistance:
         self.position = position
         self.port = port
         self.steinhart_coeffs = (1.844e-3, -3.577e-06, 2.7612e-05, -1.0234e-06)
+        self.calibration_arrays = self.load_calibration_files()
         self.data = None
 
     def __repr__(self):
@@ -135,17 +134,57 @@ class Thermistance:
         else:
             self.data = np.concatenate([self.data, port_data], axis=1)
 
-    def get_temperature(self):
-        if self.no_data:
-            return 0
+    def load_calibration_files(self):
+        self.calibration_arrays = []
+        calibration_folders_path = home_directory / "calibration_files"
+        calibration_files = sorted(calibration_folders_path.glob("*.txt"))
+        for file in calibration_files:
+            self.calibration_arrays.append(pd.read_csv(file, header=0, sep='\t').to_numpy())
+        return self.calibration_arrays
+
+    def get_calibration_data(self):
+        if 1 <= self.port.daq_port <= 3:
+            calibration_data = self.calibration_arrays[0]
+        elif self.port.daq_port == 4:
+            calibration_data = self.calibration_arrays[2]
+        elif self.port.daq_port == 5:
+            calibration_data = self.calibration_arrays[1]
+        else:
+            raise ValueError("Enter a valid DAQ port number")
+        return calibration_data
+
+    def split_extrapolation_array(self, V_m):
+        cutoff_val = self.get_calibration_data()[1].max()
+        calibration_mask = V_m <= cutoff_val
+        V_m_calibration = V_m[calibration_mask]
+        V_m_transfer_func = V_m[~calibration_mask]
+        return V_m_calibration, V_m_transfer_func
+
+    def extrapolate_w_transfer_function(self, V_m):
         params_dict = self.port.get_transfer_function_params()
         A, B, C, D = self.steinhart_coeffs
         V_s, R_m = params_dict['V_s'], params_dict['R_m']
         G_a, G_ap, X_c = params_dict['G_a'], params_dict['G_ap'], params_dict['X_c']
-        V_m = self.data[1]
         V_m = (V_m - G_a * X_c + G_ap * X_c) / G_ap
         x = np.log(1000 * ((130 - 230 * (V_m / V_s)) / (10 + 23 * (V_m / V_s)) - R_m))
-        return np.mean(1 / (A + B * x + C * x ** 2 + D * x ** 3))
+        return 1 / (A + B * x + C * x ** 2 + D * x ** 3)
+
+    def extrapolate_w_calibration_data(self, V_m):
+        calibration_data = self.get_calibration_data()
+        return np.interp(V_m, calibration_data[:, 1], calibration_data[:, 0])
+
+    def get_temperature(self):
+        if self.no_data:
+            return 0
+        V_m = self.data[1]
+        V_m_calibration, V_m_transfer_func = self.split_extrapolation_array(V_m)
+        temp_calibration = self.extrapolate_w_calibration_data(V_m_calibration)
+        if not np.any(V_m_transfer_func):
+            temp_transfer_func = np.array([])
+        else:
+            temp_transfer_func = self.extrapolate_w_transfer_function(V_m_transfer_func)
+        temp = np.hstack([temp_calibration, temp_transfer_func])
+        return np.mean(temp)
 
 
 class GlassType(StrEnum):
@@ -245,14 +284,16 @@ class PowerMeter:
         ]
         self.thermistances, self.ports = self.setup_thermistance_grid()
         self.bits_list = self.setup_bits_list()
-        self.laser_initial_guesses = [10, 0, 0, 1, 1, 25]
+        self.laser_initial_guesses = [8, 0, 0, 0.5, 0.5]
         self.laser_params = None
+        self.loading_mode = False
         self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
         self.i = 0
         self.time_cache, self.tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
         self.demux_cache = []
         self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
         self.loader = DAQLoader()
+        self.plate_ref_port = DAQPort("5.1")
 
     @property
     def x_coords(self):
@@ -269,7 +310,7 @@ class PowerMeter:
     def setup_thermistance_grid(self):
         self.thermistances = {}
         angles_list = []
-        out_ports = [DAQPort("4.13"), DAQPort("4.3"), DAQPort("4.11"), DAQPort("4.7"), DAQPort("4.9"), DAQPort("4.5")]
+        out_ports = [DAQPort("5.13"), DAQPort("5.3"), DAQPort("5.11"), DAQPort("5.7"), DAQPort("5.9"), DAQPort("5.5")]
         in_ports = [DAQPort("1"), DAQPort("2"), DAQPort("3")]
         self.ports = out_ports + in_ports
         for i in range(6):
@@ -327,28 +368,42 @@ class PowerMeter:
         if self.i > 15:
             self.i = 0
 
-    def update_cached_data(self, averaged_data, plot_lines):
-        for idx in range(5):
-            self.time_cache[idx].append(time.time() - self.start_time)
-            self.tension_cache[idx].append(averaged_data[idx])
+    def update_cached_data(self, data_to_cache, plot_lines, loading_mode = False):
+        if not loading_mode:
+            for idx in range(5):
+                self.time_cache[idx].append(time.time() - self.start_time)
+                self.tension_cache[idx].append(data_to_cache[idx])
 
+                if plot_lines is not None:
+                    plot_line = plot_lines[idx]
+                    self.plot_tension_cache[idx].append(data_to_cache[idx])
+                    self.plot_time_cache[idx].append(time.time() - self.start_time)
+
+                    # Keep only the last 100 points
+                    if len(self.plot_time_cache[idx]) > 100:
+                        self.plot_time_cache[idx].pop(0)
+                        self.plot_tension_cache[idx].pop(0)
+
+                    plot_line.set_xdata(self.plot_time_cache[idx])
+                    plot_line.set_ydata(self.plot_tension_cache[idx])
+        else:
+            self.time_cache, self.tension_cache, self.demux_cache = data_to_cache
+            self.plot_tension_cache, self.plot_time_cache = self.tension_cache, self.time_cache
+            current_len = self.plot_time_cache.shape[0]
             if plot_lines is not None:
-                plot_line = plot_lines[idx]
-                self.plot_tension_cache[idx].append(averaged_data[idx])
-                self.plot_time_cache[idx].append(time.time() - self.start_time)
-
-                # Keep only the last 100 points
-                if len(self.plot_time_cache[idx]) > 100:
-                    self.plot_time_cache[idx].pop(0)
-                    self.plot_tension_cache[idx].pop(0)
-
-                plot_line.set_xdata(self.plot_time_cache[idx])
-                plot_line.set_ydata(self.plot_tension_cache[idx])
+                for idx in range(5):
+                    plot_line = plot_lines[idx]
+                    if current_len > 100:
+                        self.plot_time_cache = self.plot_time_cache[current_len - 100: current_len, :]
+                        self.plot_tension_cache = self.plot_tension_cache[current_len - 100: current_len, :]
+                    plot_line.set_xdata(self.plot_time_cache[:, idx])
+                    plot_line.set_ydata(self.plot_tension_cache[:, idx])
 
     def fetch_cached_data(self):
         return self.time_cache, self.tension_cache, self.demux_cache
 
     def fetch_daq_data(self, plot_lines=None):
+        self.loading_mode = False
         if self.task.is_task_done():
             self.do_task.write(self.bits_list[self.i])
 
@@ -363,6 +418,13 @@ class PowerMeter:
                 if len(self.demux_cache) >= 16:
                     self.update_thermistances_data()
         return plot_lines
+
+    def fetch_simulation_data(self, load_index, plot_lines=None):
+        self.loading_mode = True
+        data_to_cache = self.loader.load_save_for_ui(load_index)
+        self.update_cached_data(data_to_cache, plot_lines, loading_mode=True)
+        if len(self.demux_cache) >= 16:
+            self.update_thermistances_data()
 
     def stop_acquisition(self):
         print("Task Closed")
@@ -391,28 +453,45 @@ class PowerMeter:
         np.save(save_path_bits, bits_array)
 
     def get_port_values(self, port:DAQPort, cached_data: tuple):
-        time_list, tension_list, demux_list = cached_data
-        bits_array = np.array(demux_list)
-        channel_data = np.array([time_list[port.daq_port - 1], tension_list[port.daq_port - 1]])
+        if not self.loading_mode:
+            time_list, tension_list, demux_list = cached_data
+            bits_array = np.array(demux_list)
+            channel_data = np.array([time_list[port.daq_port - 1], tension_list[port.daq_port - 1]])
+        else:
+            full_time_array, full_tension_array, bits_array = cached_data
+            channel_data = np.vstack([full_time_array[:, port.daq_port - 1], full_tension_array[:, port.daq_port - 1]])
         if port.demux_port:
             mask = bits_array == port.demux_port
             channel_data = channel_data[:, mask]  # Apply the mask to the appropriate dimension (columns)
         return channel_data
 
     def update_thermistances_data(self):
+        cached_data = self.fetch_cached_data()
+        # ref_value = np.mean(self.get_port_values(DAQPort("5.1"), cached_data))
+        # print(f"Reference tension: {ref_value}")
         for port in self.ports:
-            port_data = self.get_port_values(port, self.fetch_cached_data())
+            port_data = self.get_port_values(port, cached_data)
+            # self.thermistances[port].add_data(port_data - ref_value)
             self.thermistances[port].add_data(port_data)
 
     def get_temperature_values(self):
-        return [thermistance.get_temperature() for thermistance in self.thermistances.values()]
+        plate_ref_thermistance = Thermistance((0, 0), DAQPort("5.1"))
+        plate_ref_value = self.get_port_values(DAQPort("5.1"), self.fetch_cached_data())
+        if np.any(plate_ref_value):
+            plate_ref_thermistance.add_data(plate_ref_value)
+            plate_ref_temp = plate_ref_thermistance.get_temperature()
+            print(f"Plate reference temp: {plate_ref_temp}")
+        else:
+            plate_ref_temp = 0
+        return [thermistance.get_temperature() - plate_ref_temp for thermistance in self.thermistances.values()]
 
     def get_laser_params(self):
+        print(self.get_temperature_values())
         try:
             self.laser_params, _ = opt.curve_fit(
                 gaussian_2d,
                 self.xy_coords,
-                np.isfinite(self.get_temperature_values()),
+                self.get_temperature_values(),
                 p0=self.laser_initial_guesses,
                 maxfev=1000,
             )

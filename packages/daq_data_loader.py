@@ -34,6 +34,9 @@ class DAQLoader:
             self.combobox_options.append(str(folder.name).replace("QcWatt_", ""))
         return self.combobox_options
 
+    def find_combobox_index(self, combobox_option):
+        return self.combobox_options.index(combobox_option)
+
     def load_save(self, index: int):
         if self.load_cache is None or self.load_cache[0] != index:
             if index > len(self.save_folders) or index < 0:

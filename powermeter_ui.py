@@ -86,6 +86,10 @@ class UIColors(StrEnum):
             np.uint8
         )
 
+class UIMode(StrEnum):
+    Acquisition = "acquisition"
+    Loading = "loading"
+    Neutral = "neutral"
 
 class PowerMeterUI(ctk.CTk):
     def __init__(self, *args, **kwargs):
@@ -104,6 +108,7 @@ class PowerMeterUI(ctk.CTk):
         self.power_meter = PowerMeter()
         self.updating_plot = False
         self.reading_daq = False
+        self.reading_save = False
 
         self.fig, self.ax = plt.subplots()
         self.ax.set_ylim(-1, 6)  # Adjust as needed
@@ -170,9 +175,14 @@ class MainWindow(ctk.CTkFrame):
         self.configure(fg_color=UIColors.White)
         self.setup_grid(6, 3)
         self.label_font = ctk.CTkFont(family="Times New Roman", size=20, weight="bold")
+        self.toggle_font = ctk.CTkFont(family="Times New Roman", size=18, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
         self.power_meter = self.controller.power_meter
-        self.mask_path = home_directory / "ressources" / "Plate.png"
+        self.resources_path = home_directory / "resources"
+        self.mask_path = self.resources_path/ "Plate.png"
+        self.on_img = ctk.CTkImage(Image.open(self.resources_path / "on-toggle.png"), size=(50, 50))
+        self.off_img = ctk.CTkImage(Image.open(self.resources_path / "off-toggle.png"), size=(50, 50))
+        self.toggle_state = ctk.StringVar(value=UIMode.Neutral)
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
         self.X, self.Y = np.meshgrid(np.linspace(-1, 1, 400), np.linspace(-1, 1, 350))
@@ -283,6 +293,72 @@ class MainWindow(ctk.CTkFrame):
             state="disabled",
             command=lambda: self.controller.show_frame(DAQReadingsWindow),
         )
+
+        self.save_selector = ctk.CTkComboBox(
+            self,
+            values = self.power_meter.loader.combobox_options + ["None"],
+            font=self.text_font,
+            dropdown_font=self.text_font,
+            state="readonly",
+            width=175,
+        )
+        self.save_selector.set("None")
+
+        self.save_selector_label = ctk.CTkLabel(
+            self,
+            text="File to Load",
+            font=self.label_font,
+            text_color=UIColors.Black,
+        )
+
+        self.load_button = ctk.CTkButton(
+            self,
+            text="Load Save",
+            bg_color=UIColors.White,
+            fg_color=UIColors.LightGray,
+            text_color=UIColors.Black,
+            hover_color=UIColors.DarkGray,
+            corner_radius=5,
+            border_width=2,
+            font=self.label_font,
+            width=60,
+            height=30,
+            command=self.start_loading_data,
+        )
+        # Toggle setup, not used for the time being
+        # self.toggle_button = ctk.CTkButton(
+        #     self,
+        #     image=self.off_img,
+        #     text="",
+        #     fg_color="transparent",
+        #     height=50,
+        #     width=50,
+        #     anchor="center",
+        #     hover_color=UIColors.White,
+        #     command=self.update_toggle_state,
+        # )
+        #
+        # self.toggle_button_label = ctk.CTkLabel(
+        #     self,
+        #     text="Display Mode",
+        #     font=self.toggle_font,
+        #     text_color=UIColors.Black,
+        # )
+        #
+        # self.loading_label = ctk.CTkLabel(
+        #     self,
+        #     text="Loading",
+        #     font=self.toggle_font,
+        #     text_color=UIColors.Black,
+        # )
+        #
+        # self.acquisition_label = ctk.CTkLabel(
+        #     self,
+        #     text="Acquisition",
+        #     font=self.toggle_font,
+        #     text_color=UIColors.Black,
+        # )
+
         self.canvas = ctk.CTkCanvas(
             self, width=400, height=350, bg=UIColors.White, highlightthickness=0
         )
@@ -298,6 +374,18 @@ class MainWindow(ctk.CTkFrame):
         self.daq_display_button.place(relx=self.controller.relx_pos(75), rely=self.controller.rely_pos(45), anchor=ctk.NW)
         self.save_data_button.place(relx=self.controller.relx_pos(325), rely=self.controller.rely_pos(625), anchor=ctk.NW)
         self.reset_data_button.place(relx=self.controller.relx_pos(322), rely=self.controller.rely_pos(675), anchor=ctk.NW)
+        selector_pos = (530, 50)
+        self.save_selector.place(relx=self.controller.relx_pos(selector_pos[0]), rely=self.controller.rely_pos(selector_pos[1]), anchor=ctk.NW)
+        self.save_selector_label.place(relx=self.controller.relx_pos(selector_pos[0] + 35), rely=self.controller.rely_pos(selector_pos[1] - 30), anchor=ctk.NW)
+        self.load_button.place(relx=self.controller.relx_pos(selector_pos[0] + 35), rely=self.controller.rely_pos(selector_pos[1] + 120), anchor=ctk.NW)
+        # Rest of the Toggle setup
+        # toggle_pos = (590, 30)
+        # self.toggle_button.place(relx=self.controller.relx_pos(toggle_pos[0]), rely=self.controller.rely_pos(toggle_pos[1]), anchor=ctk.NW)
+        # self.toggle_button_label.place(relx=self.controller.relx_pos(toggle_pos[0] - 20), rely=self.controller.rely_pos(toggle_pos[1] - 20), anchor=ctk.NW)
+        # self.acquisition_label.place(relx=self.controller.relx_pos(toggle_pos[0] - 85),
+        #                                rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
+        # self.loading_label.place(relx=self.controller.relx_pos(toggle_pos[0] + 68),
+        #                          rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
         threading.Thread(target=self.update_values).start()
         threading.Thread(target=self.update_gradient).start()
 
@@ -404,6 +492,15 @@ class MainWindow(ctk.CTkFrame):
                 width=2,
                 tags="overlay",
             )
+    # Toggle command
+    # def update_toggle_state(self):
+    #     match self.toggle_state.get():
+    #         case UIMode.Acquisition:
+    #             self.toggle_state.set(UIMode.Loading)
+    #             self.toggle_button.configure(image=self.on_img)
+    #         case UIMode.Loading:
+    #             self.toggle_state.set(UIMode.Acquisition)
+    #             self.toggle_button.configure(image=self.off_img)
 
     def start_acquisition_daq(self):
         try:
@@ -444,6 +541,20 @@ class MainWindow(ctk.CTkFrame):
             if self.controller.updating_plot:
                 self.controller.frames[DAQReadingsWindow].update_plot()
         self.after(10, self.read_daq_data)
+
+    def start_loading_data(self):
+        self.controller.reading_save = True
+        self.read_loaded_data()
+        self.load_button.configure(state="disabled")
+
+    def read_loaded_data(self):
+        if self.controller.reading_save:
+            save_to_load = self.save_selector.get()
+            load_index = self.power_meter.loader.find_combobox_index(save_to_load)
+            self.controller.lines = self.power_meter.fetch_simulation_data(load_index, self.controller.lines)
+            if self.controller.updating_plot:
+                self.controller.frames[DAQReadingsWindow].update_plot()
+        self.after(100, self.read_loaded_data)
 
 
 class DAQReadingsWindow(ctk.CTkFrame):
