@@ -13,7 +13,7 @@ class DAQLoader:
         self.save_folders = self.get_save_folders()
         self.combobox_options = self.get_combobox_options()
         self.load_cache = None
-        self.load_index = 0
+        self.load_index = 16
         self.test_mode = test_mode
 
     def check_if_valid_folder(self, folder: Path):
@@ -48,18 +48,24 @@ class DAQLoader:
             self.load_cache = (index, time, tension, bits)
         return self.load_cache
 
-    def load_save_for_ui(self, index: int):
+    def load_save_for_ui(self, index: int, looping=False):
         _, time, tension, bits = self.load_save(index)
-        current_time = time[:self.load_index, :]
-        current_tension = tension[:self.load_index, :]
-        current_bit = bits[:self.load_index]
+        current_time = time[self.load_index - 16 :self.load_index, :]
+        current_tension = tension[self.load_index - 16 :self.load_index, :]
+        current_bit = bits[self.load_index - 16 :self.load_index]
         if self.load_index == bits.shape[0] - 1:
-            self.load_index = 0
+            if looping:
+                self.load_index = 0
+            else:
+                self.load_index = bits.shape[0] - 1
         elif 16 > bits.shape[0] - self.load_index:
             self.load_index = bits.shape[0] - 1
         else:
             self.load_index += 16
         return current_time, current_tension, current_bit
+    #
+    # def reset_loading_ui(self):
+    #
 
 
 

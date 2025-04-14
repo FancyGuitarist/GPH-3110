@@ -36,10 +36,8 @@ home_directory = Path(__file__).parents[1]
 
 def gaussian_2d(coords: tuple, A, x0, y0, sigma_x, sigma_y):
     x, y = coords
-    return (
-            A
-            * np.exp(-((x - x0) ** 2 / (2 * sigma_x ** 2) + (y - y0) ** 2 / (2 * sigma_y ** 2)))
-    )
+    # return A * np.exp(-((x - x0) ** 2 + (y - y0) ** 2)/ (2 * sigma ** 2))
+    return A * np.exp(-((x - x0) ** 2 / (2 * sigma_x ** 2) + (y - y0) ** 2 / (2 * sigma_y ** 2)))
 
 
 class DAQPort:
@@ -93,6 +91,7 @@ class Thermistance:
             self,
             position: tuple,
             port: DAQPort,
+            calibration_arrays: list[np.ndarray],
     ):
         """
         Thermistance class to represent the thermistances in the power meter.
@@ -102,7 +101,7 @@ class Thermistance:
         self.position = position
         self.port = port
         self.steinhart_coeffs = (1.844e-3, -3.577e-06, 2.7612e-05, -1.0234e-06)
-        self.calibration_arrays = self.load_calibration_files()
+        self.calibration_arrays = calibration_arrays
         self.data = None
 
     def __repr__(self):
@@ -129,18 +128,7 @@ class Thermistance:
         return True if self.data is None else False
 
     def add_data(self, port_data):
-        if self.data is None:
-            self.data = port_data
-        else:
-            self.data = np.concatenate([self.data, port_data], axis=1)
-
-    def load_calibration_files(self):
-        self.calibration_arrays = []
-        calibration_folders_path = home_directory / "calibration_files"
-        calibration_files = sorted(calibration_folders_path.glob("*.txt"))
-        for file in calibration_files:
-            self.calibration_arrays.append(pd.read_csv(file, header=0, sep='\t').to_numpy())
-        return self.calibration_arrays
+        self.data = port_data
 
     def get_calibration_data(self):
         if 1 <= self.port.daq_port <= 3:
@@ -282,9 +270,12 @@ class PowerMeter:
             Glass(GlassType.KG2),
             Glass(GlassType.VG9),
         ]
+        self.r_int = 5  # mm
+        self.r_out = 13.97  # mm
+        self.calibration_arrays = self.load_calibration_files()
         self.thermistances, self.ports = self.setup_thermistance_grid()
         self.bits_list = self.setup_bits_list()
-        self.laser_initial_guesses = [8, 0, 0, 0.5, 0.5]
+        self.laser_initial_guesses = [10, 0, 0, 8.5, 8.5]
         self.laser_params = None
         self.loading_mode = False
         self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
@@ -307,6 +298,14 @@ class PowerMeter:
     def xy_coords(self):
         return self.x_coords, self.y_coords
 
+    def load_calibration_files(self):
+        self.calibration_arrays = []
+        calibration_folders_path = home_directory / "calibration_files"
+        calibration_files = sorted(calibration_folders_path.glob("*.txt"))
+        for file in calibration_files:
+            self.calibration_arrays.append(pd.read_csv(file, header=0, sep='\t').to_numpy())
+        return self.calibration_arrays
+
     def setup_thermistance_grid(self):
         self.thermistances = {}
         angles_list = []
@@ -314,13 +313,13 @@ class PowerMeter:
         in_ports = [DAQPort("1"), DAQPort("2"), DAQPort("3")]
         self.ports = out_ports + in_ports
         for i in range(6):
-            angle = np.pi / 3 + i * np.pi / 3
+            angle = i * np.pi / 3 + np.pi/6
             angles_list.append(angle)
-            self.thermistances[out_ports[i]] = Thermistance((1.397, angle), out_ports[i])
+            self.thermistances[out_ports[i]] = Thermistance((self.r_out, angle), out_ports[i], self.calibration_arrays)
 
-        self.thermistances[DAQPort("1")] = Thermistance((0.5, angles_list[1]), DAQPort("1"))
-        self.thermistances[DAQPort("2")] = Thermistance((0.5, angles_list[3]), DAQPort("2"))
-        self.thermistances[DAQPort("3")] = Thermistance((0.5, angles_list[5]), DAQPort("3"))
+        self.thermistances[DAQPort("1")] = Thermistance((self.r_int, angles_list[5]), DAQPort("1"), self.calibration_arrays)
+        self.thermistances[DAQPort("2")] = Thermistance((self.r_int, angles_list[1]), DAQPort("2"), self.calibration_arrays)
+        self.thermistances[DAQPort("3")] = Thermistance((self.r_int, angles_list[3]), DAQPort("3"), self.calibration_arrays)
 
         return self.thermistances, self.ports
 
@@ -342,8 +341,8 @@ class PowerMeter:
         return self.bits_list
 
     def start_acquisition(self):
-        print("Task Opened")
         if self.device_detected():
+            print("Task Opened")
             device = self.check_plugged_devices()[1]
             self.task = nidaqmx.Task()
             self.task.ai_channels.add_ai_voltage_chan(f"{device}/ai0:4", terminal_config=TerminalConfiguration.RSE)
@@ -467,35 +466,31 @@ class PowerMeter:
 
     def update_thermistances_data(self):
         cached_data = self.fetch_cached_data()
-        # ref_value = np.mean(self.get_port_values(DAQPort("5.1"), cached_data))
-        # print(f"Reference tension: {ref_value}")
         for port in self.ports:
             port_data = self.get_port_values(port, cached_data)
-            # self.thermistances[port].add_data(port_data - ref_value)
             self.thermistances[port].add_data(port_data)
 
     def get_temperature_values(self):
-        plate_ref_thermistance = Thermistance((0, 0), DAQPort("5.1"))
+        plate_ref_thermistance = Thermistance((0, 0), DAQPort("5.1"), self.calibration_arrays)
         plate_ref_value = self.get_port_values(DAQPort("5.1"), self.fetch_cached_data())
         if np.any(plate_ref_value):
             plate_ref_thermistance.add_data(plate_ref_value)
             plate_ref_temp = plate_ref_thermistance.get_temperature()
-            print(f"Plate reference temp: {plate_ref_temp}")
         else:
             plate_ref_temp = 0
         return [thermistance.get_temperature() - plate_ref_temp for thermistance in self.thermistances.values()]
 
     def get_laser_params(self):
-        print(self.get_temperature_values())
         try:
             self.laser_params, _ = opt.curve_fit(
                 gaussian_2d,
                 self.xy_coords,
                 self.get_temperature_values(),
                 p0=self.laser_initial_guesses,
-                maxfev=1000,
+                bounds=([0, -15, -15, 5, 5], [60, 15, 15, 10, 10])
             )
-        except RuntimeError:
+            self.laser_initial_guesses = self.laser_params
+        except:
             print("Couldn't fit data")
             self.laser_params = self.laser_initial_guesses
         return self.laser_params
