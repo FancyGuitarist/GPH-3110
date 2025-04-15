@@ -71,6 +71,7 @@ class UIColors(StrEnum):
     LightRed = "#f2555f"
     Blue = "#6e74eb"
     LightBlue = "#a0a3eb"
+    Orange = "#E09525"
 
     @property
     def red_value(self):
@@ -174,6 +175,7 @@ class MainWindow(ctk.CTkFrame):
 
     def __init__(self, master, controller):
         super().__init__(master)
+        # App setup methods and items
         self.master = master
         self.controller = controller
         self.configure(fg_color=UIColors.White)
@@ -186,6 +188,7 @@ class MainWindow(ctk.CTkFrame):
         self.mask_path = self.resources_path/ "Plate.png"
         self.on_img = ctk.CTkImage(Image.open(self.resources_path / "on-toggle.png"), size=(50, 50))
         self.off_img = ctk.CTkImage(Image.open(self.resources_path / "off-toggle.png"), size=(50, 50))
+        # App variables
         self.toggle_state = ctk.StringVar(value=UIMode.Neutral)
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
@@ -194,6 +197,9 @@ class MainWindow(ctk.CTkFrame):
         self.elapsed_time = 0
         self.current_acquisition_time = 0
         self.updating_gradient = False
+        self.status_placement = (18, 162)
+        self.status_border_height = 60
+        self.status_border_width = 300
         self.power_txt_box = ctk.CTkTextbox(
             self,
             width=200,
@@ -205,7 +211,7 @@ class MainWindow(ctk.CTkFrame):
             text_color=UIColors.Black,
         )
         self.power_txt_box_label = ctk.CTkLabel(
-            self, text="Power (W)", font=self.label_font, text_color=UIColors.Black
+            self, text="Puissance (W)", font=self.label_font, text_color=UIColors.Black
         )
         self.wavelength_txt_box = ctk.CTkTextbox(
             self,
@@ -219,13 +225,13 @@ class MainWindow(ctk.CTkFrame):
         )
         self.wavelength_txt_box_label = ctk.CTkLabel(
             self,
-            text="Wavelength (nm)",
+            text="Longueur d'onde (nm)",
             font=self.label_font,
             text_color=UIColors.Black,
         )
         self.start_acquisition_button = ctk.CTkButton(
             self,
-            text="Start Acquisition",
+            text="Lancer Acquisition",
             bg_color=UIColors.White,
             fg_color=UIColors.Green,
             text_color=UIColors.Black,
@@ -239,7 +245,7 @@ class MainWindow(ctk.CTkFrame):
         )
         self.stop_acquisition_button = ctk.CTkButton(
             self,
-            text="Stop Acquisition",
+            text="Arrêter Acquisition",
             bg_color=UIColors.White,
             fg_color=UIColors.Red,
             text_color=UIColors.Black,
@@ -255,7 +261,7 @@ class MainWindow(ctk.CTkFrame):
 
         self.save_data_button = ctk.CTkButton(
             self,
-            text="Save Data",
+            text="Sauvegarder Données",
             bg_color=UIColors.White,
             fg_color=UIColors.Blue,
             text_color=UIColors.Black,
@@ -271,7 +277,7 @@ class MainWindow(ctk.CTkFrame):
 
         self.reset_data_button = ctk.CTkButton(
             self,
-            text="Reset Data",
+            text="Réinitialiser Données",
             bg_color=UIColors.White,
             fg_color=UIColors.Black,
             text_color=UIColors.White,
@@ -313,14 +319,14 @@ class MainWindow(ctk.CTkFrame):
 
         self.save_selector_label = ctk.CTkLabel(
             self,
-            text="File to Load",
+            text="Fichier à charger",
             font=self.label_font,
             text_color=UIColors.Black,
         )
 
         self.load_button = ctk.CTkButton(
             self,
-            text="Load Save",
+            text="Charger Sauvegarde",
             bg_color=UIColors.White,
             fg_color=UIColors.LightGray,
             text_color=UIColors.Black,
@@ -335,7 +341,7 @@ class MainWindow(ctk.CTkFrame):
 
         self.pause_loading_button = ctk.CTkButton(
             self,
-            text="Pause Loading",
+            text="Arrêter Chargement",
             bg_color=UIColors.White,
             fg_color=UIColors.LightGray,
             text_color=UIColors.Black,
@@ -350,7 +356,7 @@ class MainWindow(ctk.CTkFrame):
 
         self.position_label = ctk.CTkLabel(
             self,
-            text= "Current position:" + "\n" + "x: 0.00 mm" + "\n" + "y: 0.00 mm",
+            text= "Position actuelle:" + "\n" + "x: 0.00 mm" + "\n" + "y: 0.00 mm",
             width=60,
             height=30,
             font=self.label_font,
@@ -362,6 +368,28 @@ class MainWindow(ctk.CTkFrame):
             width=60,
             height=30,
             font=self.label_font,
+        )
+
+        self.status_border_frame = tk.Frame(
+            self,
+            bg=UIColors.Orange,
+            width=self.status_border_width,
+            height=self.status_border_height,
+        )
+        self.status_border_frame.pack_propagate(False)
+        self.status_inner_frame = tk.Frame(
+            self.status_border_frame,
+            bg=UIColors.Black,
+            width=self.status_border_width - 10,
+            height=self.status_border_height - 10,
+        )
+        self.status_label = tk.Label(
+            self.status_inner_frame,
+            text="Brancher le Puissance-Mètre pour débuter l'acquisition",
+            bg=UIColors.Black,
+            fg=UIColors.White,
+            justify="center",
+            wraplength=self.status_border_width - 10,
         )
 
         # Toggle setup, not used for the time being
@@ -405,20 +433,23 @@ class MainWindow(ctk.CTkFrame):
         self.image_id = self.canvas.create_image(0, 0, anchor=ctk.NW)
 
         self.power_txt_box.grid(row=0, column=1, padx=10, pady=10)
-        self.power_txt_box_label.place(relx=self.controller.relx_pos(335), rely=self.controller.rely_pos(12), anchor=ctk.NW)
+        self.power_txt_box_label.place(relx=self.controller.relx_pos(315), rely=self.controller.rely_pos(12), anchor=ctk.NW)
         self.wavelength_txt_box.grid(row=1, column=1, padx=10, pady=10)
-        self.wavelength_txt_box_label.place(relx=self.controller.relx_pos(300), rely=self.controller.rely_pos(135), anchor=ctk.NW)
-        self.stop_acquisition_button.place(relx=self.controller.relx_pos(395), rely=self.controller.rely_pos(575), anchor=ctk.NW)
-        self.start_acquisition_button.place(relx=self.controller.relx_pos(195), rely=self.controller.rely_pos(575), anchor=ctk.NW)
-        self.save_data_button.place(relx=self.controller.relx_pos(325), rely=self.controller.rely_pos(625), anchor=ctk.NW)
-        self.reset_data_button.place(relx=self.controller.relx_pos(322), rely=self.controller.rely_pos(675), anchor=ctk.NW)
+        self.wavelength_txt_box_label.place(relx=self.controller.relx_pos(280), rely=self.controller.rely_pos(135), anchor=ctk.NW)
+        self.stop_acquisition_button.place(relx=self.controller.relx_pos(390), rely=self.controller.rely_pos(575), anchor=ctk.NW)
+        self.start_acquisition_button.place(relx=self.controller.relx_pos(190), rely=self.controller.rely_pos(575), anchor=ctk.NW)
+        self.save_data_button.place(relx=self.controller.relx_pos(280), rely=self.controller.rely_pos(625), anchor=ctk.NW)
+        self.reset_data_button.place(relx=self.controller.relx_pos(280), rely=self.controller.rely_pos(675), anchor=ctk.NW)
         selector_pos = (530, 50)
         self.save_selector.place(relx=self.controller.relx_pos(selector_pos[0]), rely=self.controller.rely_pos(selector_pos[1]), anchor=ctk.NW)
-        self.save_selector_label.place(relx=self.controller.relx_pos(selector_pos[0] + 35), rely=self.controller.rely_pos(selector_pos[1] - 30), anchor=ctk.NW)
-        self.load_button.place(relx=self.controller.relx_pos(selector_pos[0] + 35), rely=self.controller.rely_pos(selector_pos[1] + 120), anchor=ctk.NW)
-        self.pause_loading_button.place(relx=self.controller.relx_pos(selector_pos[0] + 22), rely=self.controller.rely_pos(selector_pos[1] + 170), anchor=ctk.NW)
+        self.save_selector_label.place(relx=self.controller.relx_pos(selector_pos[0] + 10), rely=self.controller.rely_pos(selector_pos[1] - 30), anchor=ctk.NW)
+        self.load_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 50), anchor=ctk.NW)
+        self.pause_loading_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 100), anchor=ctk.NW)
         self.position_label.place(relx=self.controller.relx_pos(540), rely=self.controller.rely_pos(350), anchor=ctk.NW)
-        self.time_label.place(relx=self.controller.relx_pos(250), rely=self.controller.rely_pos(525), anchor=ctk.NW)
+        self.time_label.place(relx=self.controller.relx_pos(230), rely=self.controller.rely_pos(525), anchor=ctk.NW)
+        self.status_border_frame.place(relx=self.controller.relx_pos(self.status_placement[0]), rely=self.controller.rely_pos(self.status_placement[1]) , anchor=ctk.NW)
+        self.status_inner_frame.place(relx=0.5, rely=0.5, anchor="center")
+        self.status_label.place(relx=0.5, rely=0.5, anchor="center")
         # Rest of the Toggle setup
         # toggle_pos = (100, 30)
         # self.toggle_button.place(relx=self.controller.relx_pos(toggle_pos[0]), rely=self.controller.rely_pos(toggle_pos[1]), anchor=ctk.NW)
@@ -446,18 +477,18 @@ class MainWindow(ctk.CTkFrame):
             time.sleep(interval)
 
     def get_plate_mask_array(self):
-        x_dim = 240  # Define width
-        y_dim = round(x_dim) + 2  # Define height
+        x_dim = 340  # Define width
+        y_dim = 316 # Define height
         pad_y = (350 - y_dim) // 2  # Center vertically by evenly distributing padding
         pad_x = (400 - x_dim) // 2  # Center horizontally by evenly distributing padding
 
         if self.plate_mask_cache is None:
-            mask_img = Image.open(self.mask_path).rotate(30)  # Rotate as needed
+            mask_img = Image.open(self.mask_path).rotate(30, expand=1)  # Rotate as needed
             mask_img = mask_img.resize((x_dim, y_dim))  # Resize the mask
             mask_array = np.array(mask_img.convert("RGB"))
             mask_array = np.pad(
                 mask_array,
-                ((pad_y, pad_y), (pad_x, pad_x), (0, 0)),  # Even padding
+                ((pad_y + 4, pad_y - 4), (pad_x, pad_x), (0, 0)),  # Even padding
                 mode="constant",
             )
             self.plate_mask_cache = np.invert(mask_array.astype(bool))  # Adjust for logical inversion
@@ -466,9 +497,9 @@ class MainWindow(ctk.CTkFrame):
 
     def get_circular_mask_array(self):
         if self.circular_mask_cache is None:
-            self.circular_mask_cache = np.ones((350, 400, 3), dtype=np.uint8)
-            # rr, cc = disk((185, 200), 110)
-            # self.circular_mask_cache[rr, cc, :] = 1
+            self.circular_mask_cache = np.zeros((350, 400, 3), dtype=np.uint8)
+            rr, cc = disk((180, 200), 90)
+            self.circular_mask_cache[rr, cc, :] = 1
         return self.circular_mask_cache
 
     def apply_masks_to_gradient(self, img_array):
@@ -483,8 +514,7 @@ class MainWindow(ctk.CTkFrame):
 
     def update_position_and_time_ui(self, x0, y0):
         if self.controller.reading_daq:
-            print("updating position and time")
-            position_text = "Current position:" + "\n" + f"x: {x0:.2f} mm" + "\n" + f"y: {y0:.2f} mm"
+            position_text = "Position actuelle:" + "\n" + f"x: {x0:.2f} mm" + "\n" + f"y: {y0:.2f} mm"
             if self.power_meter.start_time is None:
                 self.current_acquisition_time = 0
             else:
@@ -497,7 +527,7 @@ class MainWindow(ctk.CTkFrame):
         params = self.power_meter.get_laser_params()
         _, x0, y0, _, _ = params
         self.update_position_and_time_ui(x0, y0)
-        Z = gaussian_2d((self.X, self.Y), *params)
+        Z = np.flip(gaussian_2d((self.X, self.Y), *params), axis=0)
         laser_position = (x0, y0)
 
         # Normalize the data to fit a colormap
@@ -587,17 +617,21 @@ class MainWindow(ctk.CTkFrame):
     #             self.toggle_state.set(UIMode.Acquisition)
     #             self.toggle_button.configure(image=self.off_img)
 
+    def update_status_txt_box(self, text):
+        self.status_label.configure(text=text, justify="center")
+
     def start_acquisition_daq(self):
         try:
             self.power_meter.start_acquisition()
         except RuntimeError:
-            print("No Device Detected")
+            self.update_status_txt_box("Puissance-Mètre non détecté")
             return
         if self.activation_count == 0:
             self.read_daq_data()
             self.activation_count += 1
         elif self.activation_count >= 1:
             self.power_meter.start_time = time.time()
+        self.update_status_txt_box("Acquisition en cours")
         self.updating_gradient = True
         threading.Thread(target=self.update_gradient).start()
         self.start_acquisition_button.configure(state="disabled")

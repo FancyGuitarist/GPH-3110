@@ -323,16 +323,20 @@ class PowerMeter:
         self.thermistances[DAQPort("3")] = Thermistance((self.r_int, angles_list[3]), DAQPort("3"), self.calibration_arrays)
 
         return self.thermistances, self.ports
-
-    def check_plugged_devices(self):
+    
+    def device_detected(self):
         system = System.local()
         devices = system.devices
-        device_name = re.search(r'Device\(name=(.+?)\)', str(devices[0])).group(1)
-        return len(devices), device_name
+        return True if len(devices) != 0 else False
 
-    def device_detected(self):
-        len_devices = self.check_plugged_devices()[0]
-        return True if len_devices > 0 else False
+    def get_plugged_device(self):
+        if self.device_detected():
+            system = System.local()
+            devices = system.devices
+            device_name = re.search(r'Device\(name=(.+?)\)', str(devices[0])).group(1)
+            return device_name
+        else:
+            return
 
     def setup_bits_list(self):
         self.bits_list = []
@@ -344,7 +348,7 @@ class PowerMeter:
     def start_acquisition(self):
         if self.device_detected():
             print("Task Opened")
-            device = self.check_plugged_devices()[1]
+            device = self.get_plugged_device()
             self.task = nidaqmx.Task()
             self.task.ai_channels.add_ai_voltage_chan(f"{device}/ai0:4", terminal_config=TerminalConfiguration.RSE)
             self.task.timing.cfg_samp_clk_timing(rate=self.sample_rate, sample_mode=AcquisitionType.FINITE,
