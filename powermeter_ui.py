@@ -266,7 +266,7 @@ class MainWindow(ctk.CTkFrame):
             width=60,
             height=30,
             state="disabled",
-            command=self.power_meter.save_current_data,
+            command=self.save_data,
         )
 
         self.reset_data_button = ctk.CTkButton(
@@ -633,6 +633,16 @@ class MainWindow(ctk.CTkFrame):
         self.reset_data_button.configure(state="disabled")
         self.start_acquisition_button.configure(state="normal")
         self.save_data_button.configure(state="disabled")
+
+    def save_data(self):
+        save_path = self.power_meter.save_current_data()
+        print(save_path.exists())
+        while not save_path.exists():
+            print("file isn't saved yet")
+            self.after(10)
+        print("file saved")
+        self.power_meter.loader.get_combobox_options()
+        self.save_selector.configure(values=self.power_meter.loader.combobox_options + ["None"])
 
     def read_daq_data(self):
         if self.controller.reading_daq:

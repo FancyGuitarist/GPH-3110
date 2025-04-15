@@ -63,9 +63,6 @@ class DAQLoader:
         else:
             self.load_index += 16
         return current_time, current_tension, current_bit
-    #
-    # def reset_loading_ui(self):
-    #
 
 
 

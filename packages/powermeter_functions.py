@@ -278,6 +278,7 @@ class PowerMeter:
         self.laser_initial_guesses = [10, 0, 0, 8.5, 8.5]
         self.laser_params = None
         self.loading_mode = False
+        self.manual_wavelength = None
         self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
         self.i = 0
         self.time_cache, self.tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
@@ -450,6 +451,7 @@ class PowerMeter:
         np.save(save_path_time, time_data_array)
         np.save(save_path_tension, tension_data_array)
         np.save(save_path_bits, bits_array)
+        return save_path_bits
 
     def get_port_values(self, port:DAQPort, cached_data: tuple):
         if not self.loading_mode:
@@ -510,8 +512,10 @@ class PowerMeter:
             ns.append(np.sqrt(1 + a + b + c))
         return ns
 
-    def get_laser_position(self, temps: list):
-        pass
+    def get_laser_position(self):
+        if self.laser_params is None:
+            return self.laser_initial_guesses[1], self.laser_initial_guesses[2]
+        return self.laser_params[1], self.laser_params[2]
 
     def get_incident_power(self, temps: list):
         pass
@@ -520,7 +524,13 @@ class PowerMeter:
         pass
 
     def estimate_wavelength(self):
-        pass
+        return 976  # For now, will implement actual function later
+
+    def get_wavelength(self):
+        if self.manual_wavelength is not None:
+            return self.manual_wavelength
+        else:
+            return self.estimate_wavelength()
 
 
 if __name__ == "__main__":
