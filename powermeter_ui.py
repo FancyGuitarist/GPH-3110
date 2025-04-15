@@ -21,8 +21,6 @@ except Exception:
 
 
 home_directory = Path(__file__).parents[0]
-SAMPLE_RATE = 10000
-SAMPLES_PER_READ = 100
 
 
 def setup_grid(self, rows: int, cols: int):
@@ -191,10 +189,11 @@ class MainWindow(ctk.CTkFrame):
         self.toggle_state = ctk.StringVar(value=UIMode.Neutral)
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
-        self.X, self.Y = np.meshgrid(np.linspace(-1, 1, 400), np.linspace(-1, 1, 350))
+        self.X, self.Y = np.meshgrid(np.linspace(-13.97, 13.97, 400), np.linspace(-13.97, 13.97, 350))
         self.activation_count = 0
         self.elapsed_time = 0
         self.current_acquisition_time = 0
+        self.updating_gradient = False
         self.power_txt_box = ctk.CTkTextbox(
             self,
             width=200,
@@ -384,20 +383,20 @@ class MainWindow(ctk.CTkFrame):
         #     font=self.toggle_font,
         #     text_color=UIColors.Black,
         # )
-        #
-        # self.loading_label = ctk.CTkLabel(
-        #     self,
-        #     text="Loading",
-        #     font=self.toggle_font,
-        #     text_color=UIColors.Black,
-        # )
-        #
-        # self.acquisition_label = ctk.CTkLabel(
-        #     self,
-        #     text="Acquisition",
-        #     font=self.toggle_font,
-        #     text_color=UIColors.Black,
-        # )
+
+        self.loading_label = ctk.CTkLabel(
+            self,
+            text="Loading",
+            font=self.toggle_font,
+            text_color=UIColors.Black,
+        )
+
+        self.acquisition_label = ctk.CTkLabel(
+            self,
+            text="Acquisition",
+            font=self.toggle_font,
+            text_color=UIColors.Black,
+        )
 
         self.canvas = ctk.CTkCanvas(
             self, width=400, height=350, bg=UIColors.White, highlightthickness=0
@@ -421,15 +420,15 @@ class MainWindow(ctk.CTkFrame):
         self.position_label.place(relx=self.controller.relx_pos(540), rely=self.controller.rely_pos(350), anchor=ctk.NW)
         self.time_label.place(relx=self.controller.relx_pos(250), rely=self.controller.rely_pos(525), anchor=ctk.NW)
         # Rest of the Toggle setup
-        # toggle_pos = (590, 30)
+        # toggle_pos = (100, 30)
         # self.toggle_button.place(relx=self.controller.relx_pos(toggle_pos[0]), rely=self.controller.rely_pos(toggle_pos[1]), anchor=ctk.NW)
         # self.toggle_button_label.place(relx=self.controller.relx_pos(toggle_pos[0] - 20), rely=self.controller.rely_pos(toggle_pos[1] - 20), anchor=ctk.NW)
         # self.acquisition_label.place(relx=self.controller.relx_pos(toggle_pos[0] - 85),
         #                                rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
         # self.loading_label.place(relx=self.controller.relx_pos(toggle_pos[0] + 68),
         #                          rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
+        self.update_gradient()
         threading.Thread(target=self.update_values).start()
-        threading.Thread(target=self.update_gradient).start()
 
     def update_values(self, random=True):
         """
@@ -484,9 +483,10 @@ class MainWindow(ctk.CTkFrame):
 
     def update_position_and_time_ui(self, x0, y0):
         if self.controller.reading_daq:
+            print("updating position and time")
             position_text = "Current position:" + "\n" + f"x: {x0:.2f} mm" + "\n" + f"y: {y0:.2f} mm"
             if self.power_meter.start_time is None:
-                acquisition_time = 0
+                self.current_acquisition_time = 0
             else:
                 self.current_acquisition_time = time.time() - self.power_meter.start_time + self.elapsed_time
             time_text = "Durée de l'enregistrement: " + f"{self.current_acquisition_time:.2f} sec"
@@ -502,11 +502,11 @@ class MainWindow(ctk.CTkFrame):
 
         # Normalize the data to fit a colormap
         norm = mcolors.Normalize(vmin=np.min(Z), vmax=np.max(Z))
-        colormap = plt.get_cmap("coolwarm")
+        colormap = plt.get_cmap("hot")
 
         # Convert the Gaussian values to RGB colors
-        # img_array = (colormap(norm(Z))[:, :, :3] * 255).astype(np.uint8)
-        img_array = np.ones((350, 400, 3), dtype=np.uint8) * UIColors.White.rgb_value
+        img_array = (colormap(norm(Z))[:, :, :3] * 255).astype(np.uint8)
+        # img_array = np.ones((350, 400, 3), dtype=np.uint8) * UIColors.White.rgb_value
         img_array = self.apply_masks_to_gradient(img_array)
 
         # Convert to PIL Image
@@ -521,7 +521,8 @@ class MainWindow(ctk.CTkFrame):
         self.draw_overlay_shapes(norm, colormap, laser_position)
 
         # Schedule next update (simulate real-time data)
-        self.canvas.after(20, self.update_gradient)  # Update every second
+        if self.updating_gradient:
+            self.canvas.after(20, self.update_gradient)  # Update every second
 
     def get_ui_thermistance_positions(self):
         positions = np.array(self.power_meter.xy_coords)
@@ -597,6 +598,8 @@ class MainWindow(ctk.CTkFrame):
             self.activation_count += 1
         elif self.activation_count >= 1:
             self.power_meter.start_time = time.time()
+        self.updating_gradient = True
+        threading.Thread(target=self.update_gradient).start()
         self.start_acquisition_button.configure(state="disabled")
         self.stop_acquisition_button.configure(state="normal")
         self.daq_display_button.configure(state="normal")
@@ -604,9 +607,11 @@ class MainWindow(ctk.CTkFrame):
         self.reset_data_button.configure(state="disabled")
         self.controller.reading_daq = True
 
+
     def stop_acquisition_daq(self):
         self.controller.updating_plot = False
         self.controller.reading_daq = False
+        self.updating_gradient = False
         self.elapsed_time = self.current_acquisition_time
         self.after(11)
         self.power_meter.stop_acquisition()
@@ -618,26 +623,34 @@ class MainWindow(ctk.CTkFrame):
 
     def reset_data(self):
         self.power_meter.reset_data()
+        self.power_meter.start_time = None
+        self.current_acquisition_time = 0
+        self.elapsed_time = 0
+        self.controller.reading_daq = True
+        self.update_position_and_time_ui(0, 0)
+        self.controller.reading_daq = False
         self.stop_acquisition_button.configure(state="disabled")
+        self.reset_data_button.configure(state="disabled")
         self.start_acquisition_button.configure(state="normal")
         self.save_data_button.configure(state="disabled")
 
     def read_daq_data(self):
         if self.controller.reading_daq:
-            self.controller.lines = self.power_meter.fetch_daq_data(self.controller.lines)
-            if self.controller.updating_plot:
-                self.controller.frames[DAQReadingsWindow].update_plot()
+            self.controller.lines = self.power_meter.fetch_daq_data()
         self.after(10, self.read_daq_data)
 
     def start_loading_data(self):
         self.controller.reading_save = True
         self.power_meter.loader.load_index = 16
         self.read_loaded_data()
+        self.updating_gradient = True
+        threading.Thread(target=self.update_gradient).start()
         self.load_button.configure(state="disabled")
         self.pause_loading_button.configure(state="normal")
 
     def pause_loading_data(self):
         self.controller.reading_save = False
+        self.updating_gradient = False
         self.load_button.configure(state="normal")
         self.pause_loading_button.configure(state="disabled")
 

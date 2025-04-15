@@ -261,7 +261,7 @@ class Glass:
 
 
 class PowerMeter:
-    def __init__(self, samples_per_read: int = 100, sample_rate=10000):
+    def __init__(self, samples_per_read: int = 30, sample_rate=10000):
         self.samples_per_read = samples_per_read
         self.sample_rate = sample_rate
 
@@ -490,9 +490,10 @@ class PowerMeter:
                 bounds=([0, -15, -15, 5, 5], [60, 15, 15, 10, 10])
             )
             self.laser_initial_guesses = self.laser_params
-        except:
+        except RuntimeError:
             print("Couldn't fit data")
             self.laser_params = self.laser_initial_guesses
+        print("Current laser params: ", self.laser_params)
         return self.laser_params
 
     def n_glasses(self, lambda_: float):
