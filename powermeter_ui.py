@@ -92,9 +92,8 @@ class UIColors(StrEnum):
         )
 
 class UIMode(StrEnum):
-    Acquisition = "acquisition"
-    Loading = "loading"
-    Neutral = "neutral"
+    Automatic = "automatic"
+    Manual = "manual"
 
 class PowerMeterUI(ctk.CTk):
     def __init__(self, *args, **kwargs):
@@ -189,7 +188,8 @@ class MainWindow(ctk.CTkFrame):
         self.on_img = ctk.CTkImage(Image.open(self.resources_path / "on-toggle.png"), size=(50, 50))
         self.off_img = ctk.CTkImage(Image.open(self.resources_path / "off-toggle.png"), size=(50, 50))
         # App variables
-        self.toggle_state = ctk.StringVar(value=UIMode.Neutral)
+        self.toggle_state = ctk.StringVar(value=UIMode.Automatic)
+        self.manual_wavelength = ctk.StringVar()
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
         self.X, self.Y = np.meshgrid(np.linspace(-13.97, 13.97, 400), np.linspace(-13.97, 13.97, 350))
@@ -393,37 +393,66 @@ class MainWindow(ctk.CTkFrame):
         )
 
         # Toggle setup, not used for the time being
-        # self.toggle_button = ctk.CTkButton(
-        #     self,
-        #     image=self.off_img,
-        #     text="",
-        #     fg_color="transparent",
-        #     height=50,
-        #     width=50,
-        #     anchor="center",
-        #     hover_color=UIColors.White,
-        #     command=self.update_toggle_state,
-        # )
-        #
-        # self.toggle_button_label = ctk.CTkLabel(
-        #     self,
-        #     text="Display Mode",
-        #     font=self.toggle_font,
-        #     text_color=UIColors.Black,
-        # )
-
-        self.loading_label = ctk.CTkLabel(
+        self.toggle_button = ctk.CTkButton(
             self,
-            text="Loading",
+            image=self.off_img,
+            text="",
+            fg_color="transparent",
+            height=50,
+            width=50,
+            anchor="center",
+            hover_color=UIColors.White,
+            command=self.update_toggle_state,
+        )
+
+        self.toggle_button_label = ctk.CTkLabel(
+            self,
+            text="Acquisition longueur d'onde",
             font=self.toggle_font,
             text_color=UIColors.Black,
         )
 
-        self.acquisition_label = ctk.CTkLabel(
+        self.manual_label = ctk.CTkLabel(
             self,
-            text="Acquisition",
+            text="Manuelle",
             font=self.toggle_font,
             text_color=UIColors.Black,
+        )
+
+        self.automatic_label = ctk.CTkLabel(
+            self,
+            text="Automatique",
+            font=self.toggle_font,
+            text_color=UIColors.Black,
+        )
+
+        self.wavelength_entry = ctk.CTkEntry(
+            self,
+            width=90,
+            font=self.label_font,
+            bg_color=UIColors.White,
+            fg_color=UIColors.White,
+            text_color=UIColors.Black,
+            textvariable=self.manual_wavelength,
+            validate="all",
+            validatecommand=(self.register(self.restrict_entry), "%P"),
+            justify="center",
+            state="disabled"
+        )
+
+        self.wavelength_button = ctk.CTkButton(
+            self,
+            text="Confirmer",
+            fg_color=UIColors.LightGray,
+            bg_color=UIColors.White,
+            text_color=UIColors.Black,
+            font=self.label_font,
+            height=30,
+            width=50,
+            anchor="center",
+            state="disabled",
+            hover_color=UIColors.DarkGray,
+            command=self.submit_wavelength,
         )
 
         self.canvas = ctk.CTkCanvas(
@@ -450,16 +479,18 @@ class MainWindow(ctk.CTkFrame):
         self.status_border_frame.place(relx=self.controller.relx_pos(self.status_placement[0]), rely=self.controller.rely_pos(self.status_placement[1]) , anchor=ctk.NW)
         self.status_inner_frame.place(relx=0.5, rely=0.5, anchor="center")
         self.status_label.place(relx=0.5, rely=0.5, anchor="center")
+        self.wavelength_entry.place(relx=self.controller.relx_pos(95), rely=self.controller.rely_pos(85), anchor=ctk.NW)
+        self.wavelength_button.place(relx=self.controller.relx_pos(88), rely=self.controller.rely_pos(123), anchor=ctk.NW)
         # Rest of the Toggle setup
-        # toggle_pos = (100, 30)
-        # self.toggle_button.place(relx=self.controller.relx_pos(toggle_pos[0]), rely=self.controller.rely_pos(toggle_pos[1]), anchor=ctk.NW)
-        # self.toggle_button_label.place(relx=self.controller.relx_pos(toggle_pos[0] - 20), rely=self.controller.rely_pos(toggle_pos[1] - 20), anchor=ctk.NW)
-        # self.acquisition_label.place(relx=self.controller.relx_pos(toggle_pos[0] - 85),
-        #                                rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
-        # self.loading_label.place(relx=self.controller.relx_pos(toggle_pos[0] + 68),
-        #                          rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
+        toggle_pos = (110, 35)
+        self.toggle_button.place(relx=self.controller.relx_pos(toggle_pos[0]), rely=self.controller.rely_pos(toggle_pos[1]), anchor=ctk.NW)
+        self.toggle_button_label.place(relx=self.controller.relx_pos(toggle_pos[0] - 80), rely=self.controller.rely_pos(toggle_pos[1] - 20), anchor=ctk.NW)
+        self.automatic_label.place(relx=self.controller.relx_pos(toggle_pos[0] - 95),
+                                       rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
+        self.manual_label.place(relx=self.controller.relx_pos(toggle_pos[0] + 68),
+                                 rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
         self.update_gradient()
-        threading.Thread(target=self.update_values).start()
+        threading.Thread(target=self.update_power_and_wavelength).start()
         threading.Thread(target=self.check_if_daq_connected).start()
 
     def check_if_daq_connected(self):
@@ -472,17 +503,33 @@ class MainWindow(ctk.CTkFrame):
                 self.start_acquisition_button.configure(state="disabled")
             self.after(50, self.check_if_daq_connected)
 
-    def update_values(self, random=True):
+    def restrict_entry(self, P):
+        """
+        Function to block any input that is not a digit or more than two digits.
+        Used for the overlap text box to restrict the input between 0 and 99%.
+        """
+        if len(P) > 4:
+            return False
+        if str.isdigit(P) or P == "":
+            return True
+        else:
+            return False
+
+    def submit_wavelength(self):
+        wavelength_txt = self.manual_wavelength.get()
+        if wavelength_txt == "":
+            self.update_status_txt_box("Entrer une valeur de longueur d'onde")
+        else:
+            self.power_meter.manual_wavelength = int(wavelength_txt)
+
+    def update_power_and_wavelength(self):
         """
         Updates the power and wavelength values in the UI at a frequency of 30 Hz.
         """
         interval = 1 / 15
         while True:
-            if random:
-                power, wavelength = random_ui_values()
-            else:
-                """ Will read values from DAQ in future update """
-                power, wavelength = 0, 0
+            """ Will read values from DAQ in future update """
+            power, wavelength = 0, self.power_meter.get_wavelength()
             self.power_txt_box.update_text_box(f"{power}")
             self.wavelength_txt_box.update_text_box(f"{wavelength}")
             time.sleep(interval)
@@ -619,14 +666,23 @@ class MainWindow(ctk.CTkFrame):
                 tags="overlay",
             )
     # Toggle command
-    # def update_toggle_state(self):
-    #     match self.toggle_state.get():
-    #         case UIMode.Acquisition:
-    #             self.toggle_state.set(UIMode.Loading)
-    #             self.toggle_button.configure(image=self.on_img)
-    #         case UIMode.Loading:
-    #             self.toggle_state.set(UIMode.Acquisition)
-    #             self.toggle_button.configure(image=self.off_img)
+    def update_toggle_state(self):
+        match self.toggle_state.get():
+            case UIMode.Automatic:
+                self.toggle_state.set(UIMode.Manual)
+                self.toggle_button.configure(image=self.on_img)
+                self.update_status_txt_box("Entrée manuelle de la longueur d'onde, entrer une valeur pour calibrer la puissance")
+                self.wavelength_entry.configure(state="normal")
+                self.wavelength_button.configure(state="normal")
+
+            case UIMode.Manual:
+                self.toggle_state.set(UIMode.Automatic)
+                self.wavelength_entry.delete(0, "end")
+                self.power_meter.manual_wavelength = None
+                self.toggle_button.configure(image=self.off_img)
+                self.update_status_txt_box("Estimation automatique de la longueur d'onde, prêt à lancer l'acquisition")
+                self.wavelength_entry.configure(state="disabled")
+                self.wavelength_button.configure(state="disabled")
 
     def update_status_txt_box(self, text):
         self.status_label.configure(text=text, justify="center")
@@ -659,6 +715,7 @@ class MainWindow(ctk.CTkFrame):
         self.updating_gradient = False
         self.elapsed_time = self.current_acquisition_time
         self.after(11)
+        self.update_status_txt_box("Acquisition mise sur pause")
         self.power_meter.stop_acquisition()
         self.start_acquisition_button.configure(state="normal")
         self.stop_acquisition_button.configure(state="disabled")
@@ -674,6 +731,7 @@ class MainWindow(ctk.CTkFrame):
         self.controller.reading_daq = True
         self.update_position_and_time_ui(0, 0)
         self.controller.reading_daq = False
+        self.update_status_txt_box("Session d'enregistrement réinitialisée")
         self.stop_acquisition_button.configure(state="disabled")
         self.reset_data_button.configure(state="disabled")
         self.start_acquisition_button.configure(state="normal")
@@ -685,7 +743,7 @@ class MainWindow(ctk.CTkFrame):
         while not save_path.exists():
             print("file isn't saved yet")
             self.after(10)
-        print("file saved")
+        self.update_status_txt_box("Données actuelles enregistrées")
         self.power_meter.loader.get_combobox_options()
         self.save_selector.configure(values=self.power_meter.loader.combobox_options + ["None"])
 
