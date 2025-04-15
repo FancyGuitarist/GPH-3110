@@ -460,6 +460,17 @@ class MainWindow(ctk.CTkFrame):
         #                          rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
         self.update_gradient()
         threading.Thread(target=self.update_values).start()
+        threading.Thread(target=self.check_if_daq_connected).start()
+
+    def check_if_daq_connected(self):
+        if self.power_meter.device_detected():
+            self.update_status_txt_box("Prêt à lancer l'acquisition")
+            self.start_acquisition_button.configure(state="normal")
+        else:
+            self.update_status_txt_box("Brancher le Puissance-Mètre pour débuter l'acquisition")
+            if self.start_acquisition_button.cget("state") == "normal":
+                self.start_acquisition_button.configure(state="disabled")
+            self.after(50, self.check_if_daq_connected)
 
     def update_values(self, random=True):
         """
@@ -621,10 +632,10 @@ class MainWindow(ctk.CTkFrame):
         self.status_label.configure(text=text, justify="center")
 
     def start_acquisition_daq(self):
-        try:
+        if self.power_meter.device_detected():
             self.power_meter.start_acquisition()
-        except RuntimeError:
-            self.update_status_txt_box("Puissance-Mètre non détecté")
+        else:
+            threading.Thread(target=self.check_if_daq_connected).start()
             return
         if self.activation_count == 0:
             self.read_daq_data()
