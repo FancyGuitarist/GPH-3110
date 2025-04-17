@@ -285,7 +285,10 @@ class PowerMeter:
         self.demux_cache = []
         self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
         self.loader = DAQLoader()
+        self.delta_t_maxes_cache = []
+        self.max_time_cache = []
         self.plate_ref_port = DAQPort("5.1")
+
 
     @property
     def x_coords(self):
@@ -536,8 +539,25 @@ class PowerMeter:
             return self.laser_initial_guesses[1], self.laser_initial_guesses[2]
         return self.laser_params[1], self.laser_params[2]
 
-    def get_incident_power(self, temps: list):
-        pass
+    def estimate_power(self, current_time, delta_max):
+        factor = 1/3.2
+        factor_2 = 4
+        self.delta_t_maxes_cache.append(delta_max)
+        self.max_time_cache.append(current_time)
+        if len(self.delta_t_maxes_cache) > 20:
+            self.delta_t_maxes_cache = self.delta_t_maxes_cache[1:] # Keeping the last 20 only
+            self.max_time_cache = self.max_time_cache[1:]
+        if len(self.delta_t_maxes_cache) > 1:
+            delta_t_array = np.array(self.delta_t_maxes_cache)
+            p_mean = np.mean(delta_t_array * factor)
+            delta_p = np.diff(delta_t_array * factor)
+            delta_t = np.diff(np.array(self.max_time_cache))
+            p_est = np.mean(delta_p/delta_t) * factor_2 + p_mean
+        else:
+            p_est = 0
+            print("Insufficient data to estimate power, returning 0W")
+        print("Current estimated power:", p_est)
+        return np.round(p_est, 2)
 
     def estimate_absorbance_of_glass(self, temps: list, glass_type: Glass):
         pass

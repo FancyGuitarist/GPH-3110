@@ -193,6 +193,7 @@ class MainWindow(ctk.CTkFrame):
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
         self.X, self.Y = np.meshgrid(np.linspace(-13.97, 13.97, 400), np.linspace(-13.97, 13.97, 350))
+        self.estimated_power = 0
         self.activation_count = 0
         self.elapsed_time = 0
         self.current_acquisition_time = 0
@@ -529,7 +530,7 @@ class MainWindow(ctk.CTkFrame):
         interval = 1 / 15
         while True:
             """ Will read values from DAQ in future update """
-            power, wavelength = 0, self.power_meter.get_wavelength()
+            power, wavelength = self.estimated_power, self.power_meter.get_wavelength()
             self.power_txt_box.update_text_box(f"{power}")
             self.wavelength_txt_box.update_text_box(f"{wavelength}")
             time.sleep(interval)
@@ -583,7 +584,8 @@ class MainWindow(ctk.CTkFrame):
 
     def update_gradient(self):
         params = self.power_meter.get_laser_params()
-        _, x0, y0, _, _ = params
+        A, x0, y0, _, _ = params
+        self.estimated_power = self.power_meter.estimate_power(time.time(), A)
         self.update_position_and_time_ui(params[1], params[2])
         Z = np.flip(gaussian_2d((self.X, self.Y), *params), axis=0)
 
