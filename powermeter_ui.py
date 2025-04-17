@@ -584,9 +584,8 @@ class MainWindow(ctk.CTkFrame):
     def update_gradient(self):
         params = self.power_meter.get_laser_params()
         _, x0, y0, _, _ = params
-        self.update_position_and_time_ui(x0, y0)
+        self.update_position_and_time_ui(params[1], params[2])
         Z = np.flip(gaussian_2d((self.X, self.Y), *params), axis=0)
-        laser_position = (x0, y0)
 
         # Normalize the data to fit a colormap
         norm = mcolors.Normalize(vmin=np.min(Z), vmax=np.max(Z))
@@ -606,7 +605,7 @@ class MainWindow(ctk.CTkFrame):
         # Update the label's image
         self.canvas.itemconfig(self.image_id, image=self.img_tk)
 
-        self.draw_overlay_shapes(norm, colormap, laser_position)
+        self.draw_overlay_shapes(norm, colormap, (params[1], params[2]))
 
         # Schedule next update (simulate real-time data)
         if self.updating_gradient:

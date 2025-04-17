@@ -57,7 +57,7 @@ class DAQPort:
     @property
     def demux_port(self):
         demux_port = re.search(r'^(\d+)(?:\.(\d+))?$', self.port_str).group(2)
-        return int(demux_port) if demux_port else None
+        return int(demux_port) + 1 if demux_port else None
 
     def __eq__(self, other):
         if isinstance(other, DAQPort):
@@ -261,7 +261,7 @@ class Glass:
 
 
 class PowerMeter:
-    def __init__(self, samples_per_read: int = 30, sample_rate=10000):
+    def __init__(self, samples_per_read: int = 10, sample_rate=10000):
         self.samples_per_read = samples_per_read
         self.sample_rate = sample_rate
 
@@ -311,16 +311,16 @@ class PowerMeter:
         self.thermistances = {}
         angles_list = []
         out_ports = [DAQPort("5.13"), DAQPort("5.3"), DAQPort("5.11"), DAQPort("5.7"), DAQPort("5.9"), DAQPort("5.5")]
-        in_ports = [DAQPort("1"), DAQPort("2"), DAQPort("3")]
-        self.ports = out_ports + in_ports
+        # in_ports = [DAQPort("1"), DAQPort("2"), DAQPort("3")]
+        self.ports = out_ports # + in_ports
         for i in range(6):
             angle = i * np.pi / 3 + np.pi/6
             angles_list.append(angle)
             self.thermistances[out_ports[i]] = Thermistance((self.r_out, angle), out_ports[i], self.calibration_arrays)
 
-        self.thermistances[DAQPort("1")] = Thermistance((self.r_int, angles_list[5]), DAQPort("1"), self.calibration_arrays)
-        self.thermistances[DAQPort("2")] = Thermistance((self.r_int, angles_list[1]), DAQPort("2"), self.calibration_arrays)
-        self.thermistances[DAQPort("3")] = Thermistance((self.r_int, angles_list[3]), DAQPort("3"), self.calibration_arrays)
+        # self.thermistances[DAQPort("1")] = Thermistance((self.r_int, angles_list[5]), DAQPort("1"), self.calibration_arrays)
+        # self.thermistances[DAQPort("2")] = Thermistance((self.r_int, angles_list[1]), DAQPort("2"), self.calibration_arrays)
+        # self.thermistances[DAQPort("3")] = Thermistance((self.r_int, angles_list[3]), DAQPort("3"), self.calibration_arrays)
 
         return self.thermistances, self.ports
     
@@ -468,6 +468,8 @@ class PowerMeter:
         if port.demux_port:
             mask = bits_array == port.demux_port
             channel_data = channel_data[:, mask]  # Apply the mask to the appropriate dimension (columns)
+        # print(f"Port: {port}")
+        # print(f"Channel Data: {channel_data}")
         return channel_data
 
     def update_thermistances_data(self):
@@ -487,19 +489,32 @@ class PowerMeter:
         return [thermistance.get_temperature() - plate_ref_temp for thermistance in self.thermistances.values()]
 
     def get_laser_params(self):
+        rotation_angle = np.radians(0)
+        rotation_matrix = np.array([[np.cos(rotation_angle), -np.sin(rotation_angle)], [np.sin(rotation_angle), np.cos(rotation_angle)]])
+        factor = 1.8
+        print(self.get_temperature_values())
         try:
-            self.laser_params, _ = opt.curve_fit(
+            popt, _ = opt.curve_fit(
                 gaussian_2d,
                 self.xy_coords,
                 self.get_temperature_values(),
                 p0=self.laser_initial_guesses,
-                bounds=([0, -15, -15, 5, 5], [60, 15, 15, 10, 10])
+                bounds=([0, -15, -15, 5, 5], [60, 15, 15, 10, 10]),
+                maxfev=1000,
             )
-            self.laser_initial_guesses = self.laser_params
+
+            if popt[0] < 0.6:
+                popt[1], popt[2] = 0, 0
+            else:
+                popt[1], popt[2] = np.dot(rotation_matrix, [popt[1] * factor, popt[2] * 1.8])
+            self.laser_params = popt
+            if abs(popt[1]) < 15 and abs(popt[2]) < 15:
+                self.laser_initial_guesses = self.laser_params
+            else:
+                self.laser_initial_guesses = [10, 0, 0, 8.5, 8.5]
         except RuntimeError:
             print("Couldn't fit data")
             self.laser_params = self.laser_initial_guesses
-        print("Current laser params: ", self.laser_params)
         return self.laser_params
 
     def n_glasses(self, lambda_: float):
