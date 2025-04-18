@@ -611,7 +611,7 @@ class MainWindow(ctk.CTkFrame):
 
         # Schedule next update (simulate real-time data)
         if self.updating_gradient:
-            self.canvas.after(20, self.update_gradient)  # Update every second
+            self.canvas.after(10, self.update_gradient)  # Update every second
 
     def get_ui_thermistance_positions(self):
         positions = np.array(self.power_meter.xy_coords)
@@ -751,7 +751,7 @@ class MainWindow(ctk.CTkFrame):
     def read_daq_data(self):
         if self.controller.reading_daq:
             self.controller.lines = self.power_meter.fetch_daq_data()
-        self.after(10, self.read_daq_data)
+        self.after(1, self.read_daq_data)
 
     def start_loading_data(self):
         self.controller.reading_save = True

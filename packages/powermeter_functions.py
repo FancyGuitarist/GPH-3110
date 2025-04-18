@@ -348,6 +348,17 @@ class PowerMeter:
             self.bits_list.append(bits)
         return self.bits_list
 
+    def clear_cache(self):
+        self.time_cache, self.tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
+        self.demux_cache = []
+        print("Cache Cleared")
+
+    def slice_cache(self):
+        for i in range(5):
+            self.time_cache[i] = self.time_cache[i][16:]
+            self.tension_cache[i] = self.tension_cache[i][16:]
+        self.demux_cache = self.demux_cache[16:]
+
     def start_acquisition(self):
         if self.device_detected():
             print("Task Opened")
@@ -424,6 +435,8 @@ class PowerMeter:
                 self.demux_cache.append(self.i)
                 if len(self.demux_cache) >= 16:
                     self.update_thermistances_data()
+                    if len(self.demux_cache) > 32:
+                        self.slice_cache()
         return plot_lines
 
     def fetch_simulation_data(self, load_index, plot_lines=None):
@@ -506,7 +519,7 @@ class PowerMeter:
                 maxfev=1000,
             )
 
-            if popt[0] < 0.6:
+            if popt[0] < 1:
                 popt[1], popt[2] = 0, 0
             else:
                 popt[1], popt[2] = np.dot(rotation_matrix, [popt[1] * factor, popt[2] * 1.8])
@@ -541,10 +554,10 @@ class PowerMeter:
 
     def estimate_power(self, current_time, delta_max):
         factor = 1/3.2
-        factor_2 = 4
+        factor_2 = 8
         self.delta_t_maxes_cache.append(delta_max)
         self.max_time_cache.append(current_time)
-        if len(self.delta_t_maxes_cache) > 20:
+        if len(self.delta_t_maxes_cache) > 50:
             self.delta_t_maxes_cache = self.delta_t_maxes_cache[1:] # Keeping the last 20 only
             self.max_time_cache = self.max_time_cache[1:]
         if len(self.delta_t_maxes_cache) > 1:
