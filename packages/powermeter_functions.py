@@ -566,6 +566,8 @@ class PowerMeter:
             delta_p = np.diff(delta_t_array * factor)
             delta_t = np.diff(np.array(self.max_time_cache))
             p_est = np.mean(delta_p/delta_t) * factor_2 + p_mean
+            if p_est < 0.1:
+                p_est = 0
         else:
             p_est = 0
             print("Insufficient data to estimate power, returning 0W")
