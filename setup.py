@@ -4,19 +4,19 @@ APP = ["powermeter_ui.py"]
 
 DATA_FILES = [
     (
-        "ressources",
+        "resources",
         [
-            "ressources/QuebecWattAppLogo.icns",
+            "resources/QuebecWattAppLogo.icns",
         ],
     ),
-    ("packages", ["packages/functions.py"]),
+    ("packages", ["packages/powermeter_functions.py"]),
 ]
 
 OPTIONS = {
     "argv_emulation": False,
     "packages": ["numpy", "tkinter"],
     "includes": ["numpy", "tkinter"],
-    "iconfile": "ressources/QuebecWattAppLogo.icns",
+    "iconfile": "resources/QuebecWattAppLogo.icns",
     "plist": {
         "CFBundleName": "PowerMeterApp",
         "CFBundleDisplayName": "PowerMeterApp",
@@ -24,7 +24,7 @@ OPTIONS = {
         "CFBundleVersion": "0.1.0",
         "CFBundleDevelopmentRegion": "en-CA",
         "CFBundleExecutable": "PowerMeterApp",
-        "CFBundleIconFile": "ressources/QuebecWattAppLogo.icns",
+        "CFBundleIconFile": "resources/QuebecWattAppLogo.icns",
         "NSHumanReadableCopyright": "© 2025 Simon Ferland",
     },
 }
