@@ -1,3 +1,30 @@
+## [0.11.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.10.0...v0.11.0) (2025-04-19)
+
+
+### Features
+
+* checking daq connected in UI ([1e31e5f](https://github.com/FancyGuitarist/GPH-3110/commit/1e31e5f99796e56fcedf5892c1226401d81b8060))
+* DAQLoader can load saves ([c28c649](https://github.com/FancyGuitarist/GPH-3110/commit/c28c64980ead637b95cb6a9c7c60d79a1d2dab02))
+* DAQLoader class + refactoring ([7e34661](https://github.com/FancyGuitarist/GPH-3110/commit/7e34661ca7012d052556a4a0a9cd8907088b2234))
+* Linked daq_readings to Gradient ([1ebc0c9](https://github.com/FancyGuitarist/GPH-3110/commit/1ebc0c93ed26a6043a69c7ad19bbc7f4006d0d76))
+* Manual wavelength selection ([a425cca](https://github.com/FancyGuitarist/GPH-3110/commit/a425cca0f404f7d5c34172a93f386246b61ae433))
+* power estimation ([4af7d70](https://github.com/FancyGuitarist/GPH-3110/commit/4af7d706b1e4620d6201ade40a9e13d64336ea21))
+* save loading in UI ([d5d398e](https://github.com/FancyGuitarist/GPH-3110/commit/d5d398e7589eb41ae5799785c6475b3b8d4ba1f1))
+* Simulation time + position estimation ([e44521b](https://github.com/FancyGuitarist/GPH-3110/commit/e44521b30c6801c45b798c261bbf3d2b8ab0a70a))
+
+
+### Bug Fixes
+
+* added Invalid Directory to test get_folders() ([f76cab2](https://github.com/FancyGuitarist/GPH-3110/commit/f76cab20648394b60249f416d029889e625ccf23))
+* cache problems ([3647bcd](https://github.com/FancyGuitarist/GPH-3110/commit/3647bcd1b19e9b7099a2380179c1d9f4be715e26))
+* DPI scaling of app ([9f1e755](https://github.com/FancyGuitarist/GPH-3110/commit/9f1e7555277c6277d4b76d7413ac8718fe3e124e))
+* Gradient updating w/ acquisition ([0541afd](https://github.com/FancyGuitarist/GPH-3110/commit/0541afda71bafe04670e4427229b269eed61ed5a))
+* lab adjustments ([ae82cd2](https://github.com/FancyGuitarist/GPH-3110/commit/ae82cd263e35d03b6bd105a2064a30c664cf5212))
+* refactoring unittests to standard convention ([abb3fd0](https://github.com/FancyGuitarist/GPH-3110/commit/abb3fd038f179a21487f245e5e851862088fce19))
+* replaced cmap with pyplot ([305ba1e](https://github.com/FancyGuitarist/GPH-3110/commit/305ba1edb7716fc7da7ca8ff2e8963e76301d17d))
+* Tried to add file checking after save ([c966dfa](https://github.com/FancyGuitarist/GPH-3110/commit/c966dfa22bf19fd18327f573721ace02590c6701))
+* UI updates and changed language to french ([f2d19b2](https://github.com/FancyGuitarist/GPH-3110/commit/f2d19b24b3e9c36cb5313c7ca1fe7c48712fff34))
+
 ## [0.10.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.9.2...v0.10.0) (2025-04-11)
 
 
