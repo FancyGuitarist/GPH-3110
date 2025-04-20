@@ -11,32 +11,19 @@ import re
 from packages.daq_data_loader import DAQLoader
 
 
-class AppModes(StrEnum):
-    """
-    Enum class to define the app modes.
-    """
-    open = "open"
-    demo = "demo"
-    locked = "locked"
-
-
 if sys.platform == "win32":
     import nidaqmx
     from nidaqmx.system import System
     from nidaqmx.stream_readers import AnalogMultiChannelReader
     from nidaqmx.constants import AcquisitionType, LineGrouping, TerminalConfiguration
 
-    app_mode = AppModes.open
-else:
-    app_mode = AppModes.locked
-
 transmission = 0.1
 home_directory = Path(__file__).parents[1]
 
 
-def gaussian_2d(coords: tuple, A, x0, y0, sigma_x, sigma_y):
+def gaussian_2d(coords: tuple, delta_t_max, x0, y0, sigma_x, sigma_y):
     x, y = coords
-    return A * np.exp(-((x - x0) ** 2 / (2 * sigma_x ** 2) + (y - y0) ** 2 / (2 * sigma_y ** 2)))
+    return delta_t_max * np.exp(-((x - x0) ** 2 / (2 * sigma_x ** 2) + (y - y0) ** 2 / (2 * sigma_y ** 2)))
 
 
 class DAQPort:
@@ -314,7 +301,6 @@ class PowerMeter:
         self.r_out = 13.97  # mm
         self.calibration_arrays = self.load_calibration_files()
         self.thermistors, self.ports = self.setup_thermistor_grid()
-        self.bits_list = self.setup_bits_list()
         self.laser_initial_guesses = [10, 0, 0, 8.5, 8.5]
         self.laser_params = None
         self.loading_mode = False
@@ -327,7 +313,13 @@ class PowerMeter:
         self.loader = DAQLoader()
         self.time_cache, self.delta_t_maxes_cache = [], []
         self.max_time_cache = []
+        self.rotation_angle = np.radians(0)
+        self.rotation_matrix = np.array(
+            [[np.cos(self.rotation_angle), -np.sin(self.rotation_angle)],
+             [np.sin(self.rotation_angle), np.cos(self.rotation_angle)]])
+        self.factor = 1.8
         self.plate_ref_port = DAQPort("5.1")
+        self.plate_ref_thermistor = Thermistor((0, 0), DAQPort("5.1"), self.calibration_arrays)
 
 
     @property
@@ -366,114 +358,38 @@ class PowerMeter:
         # self.thermistors[DAQPort("3")] = Thermistor((self.r_int, angles_list[3]), DAQPort("3"), self.calibration_arrays)
 
         return self.thermistors, self.ports
-    
-    def device_detected(self):
-        system = System.local()
-        devices = system.devices
-        return True if len(devices) != 0 else False
-
-    def get_plugged_device(self):
-        if self.device_detected():
-            system = System.local()
-            devices = system.devices
-            device_name = re.search(r'Device\(name=(.+?)\)', str(devices[0])).group(1)
-            return device_name
-        else:
-            return
-
-    def setup_bits_list(self):
-        self.bits_list = []
-        for i in range(16):
-            bits = [bool(int(b)) for b in format(i, '04b')]
-            self.bits_list.append(bits)
-        return self.bits_list
 
     def clear_cache(self):
-        self.time_cache, self.tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
-        self.demux_cache = []
+        self.tension_cache = [[] for _ in range(5)]
+        self.time_cache, self.demux_cache = [], []
         print("Cache Cleared")
 
-    def slice_cache(self):
-        for i in range(5):
-            self.tension_cache[i] = self.tension_cache[i][16:]
-        self.time_cache = self.time_cache[16:]
-        self.demux_cache = self.demux_cache[16:]
-
-    def start_acquisition(self):
-        if self.device_detected():
-            print("Task Opened")
-            device = self.get_plugged_device()
-            self.task = nidaqmx.Task()
-            self.task.ai_channels.add_ai_voltage_chan(f"{device}/ai0:4", terminal_config=TerminalConfiguration.RSE)
-            self.task.timing.cfg_samp_clk_timing(rate=self.sample_rate, sample_mode=AcquisitionType.FINITE,
-                                                 samps_per_chan=self.samples_per_read)
-            self.reader = AnalogMultiChannelReader(self.task.in_stream)
-
-            self.do_task = nidaqmx.Task()
-            self.do_task.do_channels.add_do_chan(
-                f"{device}/port0/line0:3",
-                line_grouping=LineGrouping.CHAN_PER_LINE
-            )
-
-            self.data = np.zeros((5, self.samples_per_read))
-            self.start_time = time.time()
-            self.i = 0
-        else:
-            raise RuntimeError("Device not detected")
-
-    def move_bit(self):
-        self.i += 1
-        if self.i > 15:
-            self.i = 0
-
-    def update_cached_data(self, data_to_cache, loading_mode = False):
-        if not loading_mode:
-            self.time_cache.append(time.time() - self.start_time)
+    def update_cached_data(self, daq_data, loading_mode = False):
+        if not loading_mode and len(daq_data[0]) % 16:
+            self.time_cache += daq_data[0]
+            self.demux_cache += daq_data[2]
             for idx in range(5):
-                self.tension_cache[idx].append(data_to_cache[idx])
+                self.tension_cache[idx].append(daq_data[1][idx])
         else:
-            self.time_cache, self.tension_cache, self.demux_cache = data_to_cache
+            self.time_cache, self.tension_cache, self.demux_cache = daq_data
             self.plot_tension_cache, self.plot_time_cache = self.tension_cache, self.time_cache
 
     def fetch_cached_data(self):
         return self.time_cache, self.tension_cache, self.demux_cache
 
-    def fetch_daq_data(self):
-        self.loading_mode = False
-        if self.task.is_task_done():
-            self.do_task.write(self.bits_list[self.i])
-
-            if self.do_task.is_task_done():
-                self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
-                averaged_data = np.abs(np.mean(self.data, axis=1))
-
-                self.update_cached_data(averaged_data)
-
-                self.move_bit()
-                self.demux_cache.append(self.i)
-                if len(self.demux_cache) >= 16:
-                    self.update_thermistors_data()
-                    if len(self.demux_cache) > 32:
-                        self.slice_cache()
-
     def fetch_simulation_data(self, load_index):
         self.loading_mode = True
-        data_to_cache = self.loader.load_save_for_ui(load_index)
-        self.update_cached_data(data_to_cache, loading_mode=True)
+        daq_data = self.loader.load_save_for_ui(load_index)
+        self.update_cached_data(daq_data, loading_mode=True)
         if len(self.demux_cache) >= 16:
-            self.update_thermistors_data()
-
-    def stop_acquisition(self):
-        print("Task Closed")
-        self.task.close()
-        self.do_task.close()
+            self.update_thermistors_data(daq_data)
 
     def reset_data(self):
         self.time_cache = [[] for _ in range(5)]
         self.tension_cache, self.demux_cache = [], []
         print("Data reset")
 
-    def save_current_data(self, wavelength: float = 900):
+    def save_current_data(self):
         save_folder_path = home_directory / "Saves"
         current_time = str(datetime.datetime.now())
         formatted_name = current_time.replace(" ", "_").replace(":", "_")[:-7]
@@ -490,13 +406,15 @@ class PowerMeter:
         np.save(save_path_bits, bits_array)
         return save_path_bits
 
-    def get_port_values(self, port:DAQPort, cached_data: tuple):
+    def get_port_values(self, port:DAQPort, daq_data: tuple):
         if not self.loading_mode:
-            time_list, tension_list, demux_list = cached_data
+            time_list, tension_list, demux_list = daq_data
+            print(len(time_list), len(tension_list[port.daq_port - 1]))
+            print(type(time_list[0]), type(tension_list[port.daq_port - 1][0]))
             bits_array = np.array(demux_list)
             channel_data = np.array([time_list, tension_list[port.daq_port - 1]])
         else:
-            full_time_array, full_tension_array, bits_array = cached_data
+            full_time_array, full_tension_array, bits_array = daq_data
             channel_data = np.vstack([full_time_array[:, port.daq_port - 1], full_tension_array[:, port.daq_port - 1]])
         if port.demux_port:
             mask = bits_array == port.demux_port
@@ -505,32 +423,33 @@ class PowerMeter:
         # print(f"Channel Data: {channel_data}")
         return channel_data
 
-    def update_thermistors_data(self):
-        cached_data = self.fetch_cached_data()
+    def update_thermistors_data(self, daq_data):
         for port in self.ports:
-            port_data = self.get_port_values(port, cached_data)
+            port_data = self.get_port_values(port, daq_data)
             self.thermistors[port].add_data(port_data)
 
-    def get_temperature_values(self):
-        plate_ref_thermistor = Thermistor((0, 0), DAQPort("5.1"), self.calibration_arrays)
-        plate_ref_value = self.get_port_values(DAQPort("5.1"), self.fetch_cached_data())
-        if np.any(plate_ref_value):
-            plate_ref_thermistor.add_data(plate_ref_value)
-            plate_ref_temp = plate_ref_thermistor.get_temperature()
+    def get_temperature_values(self, daq_data=None):
+        if daq_data is not None:
+            self.update_thermistors_data(daq_data)
+            plate_ref_value = self.get_port_values(DAQPort("5.1"), daq_data)
+            if np.any(plate_ref_value):
+                self.plate_ref_thermistor.add_data(plate_ref_value)
+                plate_ref_temp = self.plate_ref_thermistor.get_temperature()
+            else:
+                plate_ref_temp = 0
+            temperature_values = [thermistor.get_temperature() - plate_ref_temp for thermistor in self.thermistors.values()]
         else:
-            plate_ref_temp = 0
-        return [thermistor.get_temperature() - plate_ref_temp for thermistor in self.thermistors.values()]
+            temperature_values = [0 for _ in range(len(self.ports))]
+        return temperature_values
 
-    def get_laser_params(self):
-        rotation_angle = np.radians(0)
-        rotation_matrix = np.array([[np.cos(rotation_angle), -np.sin(rotation_angle)], [np.sin(rotation_angle), np.cos(rotation_angle)]])
-        factor = 1.8
-        print(self.get_temperature_values())
+    def get_laser_params(self, daq_data):
+        temperature_values = self.get_temperature_values(daq_data)
+        print(temperature_values)
         try:
             popt, _ = opt.curve_fit(
                 gaussian_2d,
                 self.xy_coords,
-                self.get_temperature_values(),
+                temperature_values,
                 p0=self.laser_initial_guesses,
                 bounds=([0, -15, -15, 5, 5], [60, 15, 15, 10, 10]),
                 maxfev=1000,
@@ -539,7 +458,7 @@ class PowerMeter:
             if popt[0] < 1:
                 popt[1], popt[2] = 0, 0
             else:
-                popt[1], popt[2] = np.dot(rotation_matrix, [popt[1] * factor, popt[2] * 1.8])
+                popt[1], popt[2] = np.dot(self.rotation_matrix, [popt[1] * self.factor, popt[2] * 1.8])
             self.laser_params = popt
             if abs(popt[1]) < 15 and abs(popt[2]) < 15:
                 self.laser_initial_guesses = self.laser_params
@@ -575,7 +494,7 @@ class PowerMeter:
         self.delta_t_maxes_cache.append(delta_max)
         self.max_time_cache.append(current_time)
         if len(self.delta_t_maxes_cache) > 50:
-            self.delta_t_maxes_cache = self.delta_t_maxes_cache[1:] # Keeping the last 20 only
+            self.delta_t_maxes_cache = self.delta_t_maxes_cache[1:] # Keeping the last 50 only
             self.max_time_cache = self.max_time_cache[1:]
         if len(self.delta_t_maxes_cache) > 1:
             delta_t_array = np.array(self.delta_t_maxes_cache)
