@@ -527,21 +527,19 @@ class MainWindow(ctk.CTkFrame):
         """
         Updates the power and wavelength values in the UI at a frequency of 30 Hz.
         """
-        interval = 1 / 15
-        while True:
+        if self.updating_gradient:
             """ Will read values from DAQ in future update """
             power, wavelength = self.estimated_power, self.power_meter.get_wavelength()
             self.power_txt_box.update_text_box(f"{power}")
             self.wavelength_txt_box.update_text_box(f"{wavelength}")
-            time.sleep(interval)
+        self.after(50, self.update_power_and_wavelength)
 
     def get_plate_mask_array(self):
-        x_dim = 340  # Define width
-        y_dim = 316 # Define height
-        pad_y = (350 - y_dim) // 2  # Center vertically by evenly distributing padding
-        pad_x = (400 - x_dim) // 2  # Center horizontally by evenly distributing padding
-
         if self.plate_mask_cache is None:
+            x_dim = 340  # Define width
+            y_dim = 316  # Define height
+            pad_y = (350 - y_dim) // 2  # Center vertically by evenly distributing padding
+            pad_x = (400 - x_dim) // 2  # Center horizontally by evenly distributing padding
             mask_img = Image.open(self.mask_path).rotate(30, expand=1)  # Rotate as needed
             mask_img = mask_img.resize((x_dim, y_dim))  # Resize the mask
             mask_array = np.array(mask_img.convert("RGB"))
@@ -556,19 +554,16 @@ class MainWindow(ctk.CTkFrame):
 
     def get_circular_mask_array(self):
         if self.circular_mask_cache is None:
-            self.circular_mask_cache = np.zeros((350, 400, 3), dtype=np.uint8)
+            circular_mask = np.zeros((350, 400, 3), dtype=np.uint8)
             rr, cc = disk((180, 200), 90)
-            self.circular_mask_cache[rr, cc, :] = 1
+            circular_mask[rr, cc, :] = 1
+            self.circular_mask_cache = circular_mask, np.invert(circular_mask.astype(np.bool))
         return self.circular_mask_cache
 
     def apply_masks_to_gradient(self, img_array):
-        circular_mask_array = self.get_circular_mask_array()
-        background = (
-            np.invert(circular_mask_array.astype(np.bool)) * UIColors.White.rgb_value
-        )
-        masked_array = (
-            img_array * circular_mask_array + background
-        ) * self.get_plate_mask_array()
+        circular_mask_array, inverse_circular_mask = self.get_circular_mask_array()
+        background = inverse_circular_mask * UIColors.White.rgb_value
+        masked_array = (img_array * circular_mask_array + background) * self.get_plate_mask_array()
         return masked_array
 
     def update_position_and_time_ui(self, x0, y0):
@@ -595,7 +590,6 @@ class MainWindow(ctk.CTkFrame):
 
         # Convert the Gaussian values to RGB colors
         img_array = (colormap(norm(Z))[:, :, :3] * 255).astype(np.uint8)
-        # img_array = np.ones((350, 400, 3), dtype=np.uint8) * UIColors.White.rgb_value
         img_array = self.apply_masks_to_gradient(img_array)
 
         # Convert to PIL Image
@@ -616,56 +610,46 @@ class MainWindow(ctk.CTkFrame):
     def get_ui_thermistance_positions(self):
         positions = np.array(self.power_meter.xy_coords)
         r_out = self.power_meter.r_out
-        positions[0, :] += r_out
-        positions[1, :] = np.abs(positions[1, :] - r_out)
-        positions /= r_out * 2
-        positions[0, :] *= 200
-        positions[1, :] *= 175
-        positions[0, :] += 100
-        positions[1, :] += 92.5
+        positions[0, :] = ((positions[0, :] + r_out) / (r_out * 2)) * 200 + 100
+        positions[1, :] = (np.abs(positions[1, :] - r_out) / (r_out * 2)) * 175 + 92.5
         return positions
 
     def convert_radial_to_ui_pos(self, pos):
         x, y = pos
         r_out = self.power_meter.r_out
-        x += r_out
-        y -= r_out
-        x = x / (r_out * 2)
-        y = abs(y) / (r_out * 2)
-        x, y = (x * 200) + 100, (y * 175) + 92.5
+        x = ((x + r_out) / (r_out * 2)) * 200 + 100
+        y = (abs(y - r_out) / (r_out * 2)) * 175 + 92.5
         return x, y
 
     def draw_overlay_shapes(self, norm, colormap, current_pos):
         """Draw circles or other shapes on top of the heatmap"""
-        self.canvas.delete("overlay")  # Remove previous shapes
-        x, y = self.convert_radial_to_ui_pos(current_pos)
-        temps = self.power_meter.get_temperature_values()
-        positions = self.get_ui_thermistance_positions()
-        self.canvas.create_oval(
-            x - 10,
-            y - 10,
-            x + 10,
-            y + 10,
-            fill="Red",
-            outline="Black",
-            width=2,
-            tags="overlay",
-        )
+        if not hasattr(self, "overlay_shapes_initialized"):
+            # Initialize once
+            self.first_oval = self.canvas.create_oval(
+                0, 0, 0, 0, fill="Red", outline="Black", width=2, tags="overlay"
+            )
+            self.other_ovals = []
+            positions = self.get_ui_thermistance_positions()
+            for index in range(len(positions[0])):
+                x, y = positions[:, index]
+                oval = self.canvas.create_oval(
+                    x - 5, y - 5, x + 5, y + 5,
+                    fill="Black", outline="Black", width=2, tags="overlay"
+                )
+                self.other_ovals.append(oval)
+            self.overlay_shapes_initialized = True
 
-        for index in range(len(temps)):
-            x, y = positions[:, index]
+        # Update the position and color of the first oval
+        x, y = self.convert_radial_to_ui_pos(current_pos)
+        self.canvas.coords(self.first_oval, x - 10, y - 10, x + 10, y + 10)
+
+        # Update colors of the other ovals
+        temps = self.power_meter.get_temperature_values()
+        for index, oval in enumerate(self.other_ovals):
             current_color = colormap(norm(temps[index]))
             current_color_hex = mcolors.rgb2hex(current_color)
-            self.canvas.create_oval(
-                x - 5,
-                y - 5,
-                x + 5,
-                y + 5,
-                fill=str(current_color_hex),
-                outline="Black",
-                width=2,
-                tags="overlay",
-            )
+            self.canvas.itemconfig(oval, fill=str(current_color_hex))
+
     # Toggle command
     def update_toggle_state(self):
         match self.toggle_state.get():
@@ -750,7 +734,7 @@ class MainWindow(ctk.CTkFrame):
 
     def read_daq_data(self):
         if self.controller.reading_daq:
-            self.controller.lines = self.power_meter.fetch_daq_data()
+            self.power_meter.fetch_daq_data()
         self.after(1, self.read_daq_data)
 
     def start_loading_data(self):
@@ -772,7 +756,7 @@ class MainWindow(ctk.CTkFrame):
         if self.controller.reading_save:
             save_to_load = self.save_selector.get()
             load_index = self.power_meter.loader.find_combobox_index(save_to_load)
-            self.controller.lines = self.power_meter.fetch_simulation_data(load_index, self.controller.lines)
+            self.power_meter.fetch_simulation_data(load_index)
             if self.controller.updating_plot:
                 self.controller.frames[DAQReadingsWindow].update_plot()
             self.after(10, self.read_loaded_data)
