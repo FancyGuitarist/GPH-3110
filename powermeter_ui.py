@@ -586,7 +586,8 @@ class MainWindow(ctk.CTkFrame):
             self.time_label.configure(text=time_text)
     
     def calculate_gradient(self, daq_data=None):
-        if daq_data is not None and len(daq_data[0]) % 16 == 0:
+        if daq_data is not None:
+            daq_data = self.power_meter.update_data(daq_data)
             params = self.power_meter.get_laser_params(daq_data)
             self.estimated_power = self.power_meter.estimate_power(time.time(), params[0])
             self.update_position_and_time_ui(params[1], params[2])
@@ -596,7 +597,6 @@ class MainWindow(ctk.CTkFrame):
             self.estimated_power = 0
             self.update_position_and_time_ui(params[1], params[2])
             temps = [0 for _ in range(len(self.power_meter.ports))]
-        print("Current params: ", params)
         Z = np.flip(gaussian_2d((self.X, self.Y), *params), axis=0)
 
         # Normalize the data to fit a colormap
@@ -751,10 +751,9 @@ class MainWindow(ctk.CTkFrame):
         self.save_selector.configure(values=self.power_meter.loader.combobox_options + ["None"])
 
     def read_daq_data_loop(self):
-        daq_data = ([], [[] for _ in range(5)], [])
         while self.controller.reading_daq:
             try:
-                daq_data = self.daq_reader.fetch_daq_data(daq_data)
+                daq_data = self.daq_reader.fetch_daq_data()
                 self.data_queue.put(daq_data)
             except Exception as e:
                 print(f"Error reading DAQ: {e}")

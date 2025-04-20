@@ -126,7 +126,6 @@ class Thermistor:
     def theta(self):
         return self.position[1]
 
-    @property
     def no_data(self):
         return True if self.data is None else False
 
@@ -189,7 +188,7 @@ class Thermistor:
         Function to convert Thermistor's current tension values into a temperature value
         :return: Temperature value
         """
-        if self.no_data:
+        if self.no_data():
             return 0
         V_m = self.data[1]
         V_m_calibration, V_m_transfer_func = self.split_extrapolation_array(V_m)
@@ -308,10 +307,12 @@ class PowerMeter:
         self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
         self.i = 0
         self.tension_cache = [[] for _ in range(5)]
-        self.demux_cache = []
+        self.time_cache, self.demux_cache = [], []
+        self.tension_list = [[] for _ in range(5)]
+        self.time_list, self.demux_list = [], []
         self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
         self.loader = DAQLoader()
-        self.time_cache, self.delta_t_maxes_cache = [], []
+        self.delta_t_maxes_cache = []
         self.max_time_cache = []
         self.rotation_angle = np.radians(0)
         self.rotation_matrix = np.array(
@@ -364,6 +365,26 @@ class PowerMeter:
         self.time_cache, self.demux_cache = [], []
         print("Cache Cleared")
 
+    def slice_daq_data(self, time_list, tension_list, demux_list):
+        for i in range(5):
+            tension_list[i] = tension_list[i][16:]
+        time_list = time_list[16:]
+        demux_list = demux_list[16:]
+        return time_list, tension_list, demux_list
+
+    def update_data(self, daq_data):
+        time_value, tension_values, demux_value = daq_data
+        for idx in range(5):
+            self.tension_list[idx].append(tension_values[idx])
+        self.time_list.append(time_value)
+        self.demux_list.append(demux_value)
+
+        if len(self.demux_list) % 16 == 0:
+            if len(self.demux_list) == 32:
+                self.time_list, self.tension_list, self.demux_list = self.slice_daq_data(self.time_list, self.tension_list, self.demux_list)
+
+        return self.time_list, self.tension_list, self.demux_list
+
     def update_cached_data(self, daq_data, loading_mode = False):
         if not loading_mode and len(daq_data[0]) % 16:
             self.time_cache += daq_data[0]
@@ -409,8 +430,6 @@ class PowerMeter:
     def get_port_values(self, port:DAQPort, daq_data: tuple):
         if not self.loading_mode:
             time_list, tension_list, demux_list = daq_data
-            print(len(time_list), len(tension_list[port.daq_port - 1]))
-            print(type(time_list[0]), type(tension_list[port.daq_port - 1][0]))
             bits_array = np.array(demux_list)
             channel_data = np.array([time_list, tension_list[port.daq_port - 1]])
         else:
@@ -419,8 +438,8 @@ class PowerMeter:
         if port.demux_port:
             mask = bits_array == port.demux_port
             channel_data = channel_data[:, mask]  # Apply the mask to the appropriate dimension (columns)
-        # print(f"Port: {port}")
-        # print(f"Channel Data: {channel_data}")
+        print(f"Port: {port}")
+        print(f"Channel Data: {channel_data}")
         return channel_data
 
     def update_thermistors_data(self, daq_data):
@@ -443,29 +462,34 @@ class PowerMeter:
         return temperature_values
 
     def get_laser_params(self, daq_data):
-        temperature_values = self.get_temperature_values(daq_data)
-        print(temperature_values)
-        try:
-            popt, _ = opt.curve_fit(
-                gaussian_2d,
-                self.xy_coords,
-                temperature_values,
-                p0=self.laser_initial_guesses,
-                bounds=([0, -15, -15, 5, 5], [60, 15, 15, 10, 10]),
-                maxfev=1000,
-            )
+        if len(daq_data[0]) % 16 == 0:
+            print("Daq data ready, estimating gradient")
+            temperature_values = self.get_temperature_values(daq_data)
+            print(temperature_values)
+            try:
+                popt, _ = opt.curve_fit(
+                    gaussian_2d,
+                    self.xy_coords,
+                    temperature_values,
+                    p0=self.laser_initial_guesses,
+                    bounds=([0, -15, -15, 5, 5], [60, 15, 15, 10, 10]),
+                    maxfev=1000,
+                )
 
-            if popt[0] < 1:
-                popt[1], popt[2] = 0, 0
-            else:
-                popt[1], popt[2] = np.dot(self.rotation_matrix, [popt[1] * self.factor, popt[2] * 1.8])
-            self.laser_params = popt
-            if abs(popt[1]) < 15 and abs(popt[2]) < 15:
-                self.laser_initial_guesses = self.laser_params
-            else:
-                self.laser_initial_guesses = [10, 0, 0, 8.5, 8.5]
-        except RuntimeError:
-            print("Couldn't fit data")
+                if popt[0] < 1:
+                    popt[1], popt[2] = 0, 0
+                else:
+                    popt[1], popt[2] = np.dot(self.rotation_matrix, [popt[1] * self.factor, popt[2] * 1.8])
+                self.laser_params = popt
+                if abs(popt[1]) < 15 and abs(popt[2]) < 15:
+                    self.laser_initial_guesses = self.laser_params
+                else:
+                    self.laser_initial_guesses = [10, 0, 0, 8.5, 8.5]
+            except RuntimeError:
+                print("Couldn't fit data")
+                self.laser_params = self.laser_initial_guesses
+        else:
+            print("Daq data isn't of length 16 yet")
             self.laser_params = self.laser_initial_guesses
         return self.laser_params
 

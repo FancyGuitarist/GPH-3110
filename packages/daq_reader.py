@@ -79,31 +79,17 @@ class DAQReader:
         if self.i > 15:
             self.i = 0
 
-    def slice_daq_data(self, time_list, tension_list, demux_list):
-        for i in range(5):
-            tension_list[i] = tension_list[i][16:]
-        time_list = time_list[16:]
-        demux_list = demux_list[16:]
-        return time_list, tension_list, demux_list
-
-    def fetch_daq_data(self, daq_data):
-        time_list, tension_list, demux_list = daq_data
+    def fetch_daq_data(self):
         if self.task.is_task_done():
             self.do_task.write(self.bits_list[self.i])
 
             if self.do_task.is_task_done():
                 self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
                 averaged_data = np.abs(np.mean(self.data, axis=1))
-                for idx in range(5):
-                    tension_list[idx].append(averaged_data[idx])
-                time_list.append(time.time() - self.start_time)
-                demux_list.append(self.i)
+                current_time = time.time() - self.start_time
 
                 self.move_bit()
-        if len(demux_list) % 16 == 0:
-            if len(demux_list) == 32:
-                time_list, tension_list, demux_list = self.slice_daq_data(time_list, tension_list, demux_list)
-        return time_list, tension_list, demux_list
+        return current_time, averaged_data, self.i
 
     def stop_acquisition(self):
         print("Task Closed")
