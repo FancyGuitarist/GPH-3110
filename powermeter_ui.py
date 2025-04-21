@@ -111,6 +111,7 @@ class PowerMeterUI(ctk.CTk):
         self.maxsize(self.system_width, self.system_height)
 
         # Variables to be shared between frames
+        self.exam_mode = True
         self.power_meter = PowerMeter()
         self.daq_reader = DAQReader()
         self.updating_plot = False
@@ -198,6 +199,7 @@ class MainWindow(ctk.CTkFrame):
         self.manual_wavelength = ctk.StringVar()
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
+        self.canvas_background = (np.ones((350, 400, 3)) * UIColors.LightGray.rgb_value).astype(np.uint8)
         self.X, self.Y = np.meshgrid(np.linspace(-13.97, 13.97, 400), np.linspace(-13.97, 13.97, 350))
         self.estimated_power = 0
         self.activation_count = 0
@@ -476,11 +478,12 @@ class MainWindow(ctk.CTkFrame):
         self.start_acquisition_button.place(relx=self.controller.relx_pos(190), rely=self.controller.rely_pos(575), anchor=ctk.NW)
         self.save_data_button.place(relx=self.controller.relx_pos(280), rely=self.controller.rely_pos(625), anchor=ctk.NW)
         self.reset_data_button.place(relx=self.controller.relx_pos(280), rely=self.controller.rely_pos(675), anchor=ctk.NW)
-        selector_pos = (530, 50)
-        self.save_selector.place(relx=self.controller.relx_pos(selector_pos[0]), rely=self.controller.rely_pos(selector_pos[1]), anchor=ctk.NW)
-        self.save_selector_label.place(relx=self.controller.relx_pos(selector_pos[0] + 10), rely=self.controller.rely_pos(selector_pos[1] - 30), anchor=ctk.NW)
-        self.load_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 50), anchor=ctk.NW)
-        self.pause_loading_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 100), anchor=ctk.NW)
+        if not self.controller.exam_mode:
+            selector_pos = (530, 50)
+            self.save_selector.place(relx=self.controller.relx_pos(selector_pos[0]), rely=self.controller.rely_pos(selector_pos[1]), anchor=ctk.NW)
+            self.save_selector_label.place(relx=self.controller.relx_pos(selector_pos[0] + 10), rely=self.controller.rely_pos(selector_pos[1] - 30), anchor=ctk.NW)
+            self.load_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 50), anchor=ctk.NW)
+            self.pause_loading_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 100), anchor=ctk.NW)
         self.position_label.place(relx=self.controller.relx_pos(540), rely=self.controller.rely_pos(350), anchor=ctk.NW)
         self.time_label.place(relx=self.controller.relx_pos(230), rely=self.controller.rely_pos(525), anchor=ctk.NW)
         self.status_border_frame.place(relx=self.controller.relx_pos(self.status_placement[0]), rely=self.controller.rely_pos(self.status_placement[1]) , anchor=ctk.NW)
@@ -498,6 +501,7 @@ class MainWindow(ctk.CTkFrame):
                                  rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
         gradient_result = self.calculate_gradient()
         self.update_gradient(gradient_result)
+        self.setup_canvas_image()
         threading.Thread(target=self.update_power_and_wavelength).start()
         threading.Thread(target=self.check_if_daq_connected).start()
         self.after(10, self.update_from_queue)
@@ -584,6 +588,12 @@ class MainWindow(ctk.CTkFrame):
             time_text = "Durée de l'enregistrement: " + f"{self.current_acquisition_time:.2f} sec"
             self.position_label.configure(text=position_text)
             self.time_label.configure(text=time_text)
+
+    def setup_canvas_image(self):
+        img_array = self.apply_masks_to_gradient(self.canvas_background)
+        img = Image.fromarray(img_array)
+        self.img_tk = ImageTk.PhotoImage(img)
+        self.canvas.itemconfig(self.image_id, image=self.img_tk)
     
     def calculate_gradient(self, daq_data=None):
         if daq_data is not None:
@@ -603,22 +613,11 @@ class MainWindow(ctk.CTkFrame):
         norm = mcolors.Normalize(vmin=np.min(Z), vmax=np.max(Z))
         colormap = plt.get_cmap("hot")
 
-        # Convert the Gaussian values to RGB colors
-        img_array = (colormap(norm(Z))[:, :, :3] * 255).astype(np.uint8)
-        img_array = self.apply_masks_to_gradient(img_array)
-
-        # Convert to PIL Image
-        img = Image.fromarray(img_array)
-        self.img_tk = ImageTk.PhotoImage(img)
-
         # Convert to Tkinter-compatible format
-        return self.img_tk, norm, colormap, (params[1], params[2]), temps
+        return norm, colormap, (params[1], params[2]), temps
 
     def update_gradient(self, gradient_result):
-        self.img_tk, norm, colormap, current_pos, temps = gradient_result
-
-        # Update the label's image
-        self.canvas.itemconfig(self.image_id, image=self.img_tk)
+        norm, colormap, current_pos, temps = gradient_result
 
         self.draw_overlay_shapes(norm, colormap, current_pos, temps)
 
@@ -701,6 +700,7 @@ class MainWindow(ctk.CTkFrame):
         if self.activation_count == 0:
             self.activation_count += 1
         elif self.activation_count >= 1:
+            self.daq_thread = threading.Thread(target=self.read_daq_data_loop, daemon=True)
             self.power_meter.start_time = time.time()
         self.controller.reading_daq = True
         self.daq_thread.start()
