@@ -438,8 +438,8 @@ class PowerMeter:
         if port.demux_port:
             mask = bits_array == port.demux_port
             channel_data = channel_data[:, mask]  # Apply the mask to the appropriate dimension (columns)
-        print(f"Port: {port}")
-        print(f"Channel Data: {channel_data}")
+        # print(f"Port: {port}")
+        # print(f"Channel Data: {channel_data}")
         return channel_data
 
     def update_thermistors_data(self, daq_data):
@@ -463,7 +463,6 @@ class PowerMeter:
 
     def get_laser_params(self, daq_data):
         if len(daq_data[0]) % 16 == 0:
-            print("Daq data ready, estimating gradient")
             temperature_values = self.get_temperature_values(daq_data)
             print(temperature_values)
             try:
@@ -531,7 +530,7 @@ class PowerMeter:
         else:
             p_est = 0
             print("Insufficient data to estimate power, returning 0W")
-        print("Current estimated power:", p_est)
+        # print("Current estimated power:", p_est)
         return np.round(p_est, 2)
 
     def estimate_absorbance_of_glass(self, temps: list, glass_type: Glass):

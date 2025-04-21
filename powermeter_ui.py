@@ -502,7 +502,6 @@ class MainWindow(ctk.CTkFrame):
         gradient_result = self.calculate_gradient()
         self.update_gradient(gradient_result)
         self.setup_canvas_image()
-        threading.Thread(target=self.update_power_and_wavelength).start()
         threading.Thread(target=self.check_if_daq_connected).start()
         self.after(10, self.update_from_queue)
 
@@ -535,16 +534,14 @@ class MainWindow(ctk.CTkFrame):
         else:
             self.power_meter.manual_wavelength = int(wavelength_txt)
 
-    def update_power_and_wavelength(self):
+    def update_power_and_wavelength(self, power, wavelength):
         """
         Updates the power and wavelength values in the UI at a frequency of 30 Hz.
         """
-        if self.updating_gradient:
-            """ Will read values from DAQ in future update """
-            power, wavelength = self.estimated_power, self.power_meter.get_wavelength()
+        if self.controller.reading_daq:
+            print("Current Power and Wavelength: ", power, wavelength)
             self.power_txt_box.update_text_box(f"{power}")
             self.wavelength_txt_box.update_text_box(f"{wavelength}")
-        self.after(50, self.update_power_and_wavelength)
 
     def get_plate_mask_array(self):
         if self.plate_mask_cache is None:
@@ -581,10 +578,10 @@ class MainWindow(ctk.CTkFrame):
     def update_position_and_time_ui(self, x0, y0):
         if self.controller.reading_daq:
             position_text = "Position actuelle:" + "\n" + f"x: {x0:.2f} mm" + "\n" + f"y: {y0:.2f} mm"
-            if self.power_meter.start_time is None:
+            if self.daq_reader.start_time is None:
                 self.current_acquisition_time = 0
             else:
-                self.current_acquisition_time = time.time() - self.power_meter.start_time + self.elapsed_time
+                self.current_acquisition_time = time.time() - self.daq_reader.start_time + self.elapsed_time
             time_text = "Durée de l'enregistrement: " + f"{self.current_acquisition_time:.2f} sec"
             self.position_label.configure(text=position_text)
             self.time_label.configure(text=time_text)
@@ -600,13 +597,12 @@ class MainWindow(ctk.CTkFrame):
             daq_data = self.power_meter.update_data(daq_data)
             params = self.power_meter.get_laser_params(daq_data)
             self.estimated_power = self.power_meter.estimate_power(time.time(), params[0])
-            self.update_position_and_time_ui(params[1], params[2])
             temps = self.power_meter.get_temperature_values(daq_data)
         else:
             params = self.power_meter.laser_initial_guesses
             self.estimated_power = 0
-            self.update_position_and_time_ui(params[1], params[2])
             temps = [0 for _ in range(len(self.power_meter.ports))]
+        self.update_position_and_time_ui(params[1], params[2])
         Z = np.flip(gaussian_2d((self.X, self.Y), *params), axis=0)
 
         # Normalize the data to fit a colormap
@@ -614,10 +610,11 @@ class MainWindow(ctk.CTkFrame):
         colormap = plt.get_cmap("hot")
 
         # Convert to Tkinter-compatible format
-        return norm, colormap, (params[1], params[2]), temps
+        return norm, colormap, (params[1], params[2]), temps, self.estimated_power
 
     def update_gradient(self, gradient_result):
-        norm, colormap, current_pos, temps = gradient_result
+        norm, colormap, current_pos, temps, self.estimated_power = gradient_result
+        self.update_power_and_wavelength(self.estimated_power, 976)
 
         self.draw_overlay_shapes(norm, colormap, current_pos, temps)
 
@@ -729,7 +726,7 @@ class MainWindow(ctk.CTkFrame):
 
     def reset_data(self):
         self.power_meter.reset_data()
-        self.power_meter.start_time = None
+        self.daq_reader.start_time = None
         self.current_acquisition_time = 0
         self.elapsed_time = 0
         self.controller.reading_daq = True
