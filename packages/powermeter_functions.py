@@ -8,7 +8,6 @@ import sys
 import time
 import datetime
 import re
-from packages.daq_data_loader import DAQLoader
 
 
 if sys.platform == "win32":
@@ -198,7 +197,7 @@ class Thermistor:
         else:
             temp_transfer_func = self.extrapolate_w_transfer_function(V_m_transfer_func)
         temp = np.hstack([temp_calibration, temp_transfer_func])
-        return np.mean(temp)
+        return np.nan_to_num(np.mean(temp))
 
 
 class GlassType(StrEnum):
@@ -302,7 +301,6 @@ class PowerMeter:
         self.thermistors, self.ports = self.setup_thermistor_grid()
         self.laser_initial_guesses = [10, 0, 0, 8.5, 8.5]
         self.laser_params = None
-        self.loading_mode = False
         self.manual_wavelength = None
         self.task, self.reader, self.do_task, self.start_time, self.data = None, None, None, None, None
         self.i = 0
@@ -311,7 +309,6 @@ class PowerMeter:
         self.tension_list = [[] for _ in range(5)]
         self.time_list, self.demux_list = [], []
         self.plot_time_cache, self.plot_tension_cache = [[] for _ in range(5)], [[] for _ in range(5)]
-        self.loader = DAQLoader()
         self.delta_t_maxes_cache = []
         self.max_time_cache = []
         self.rotation_angle = np.radians(0)
@@ -385,25 +382,16 @@ class PowerMeter:
 
         return self.time_list, self.tension_list, self.demux_list
 
-    def update_cached_data(self, daq_data, loading_mode = False):
-        if not loading_mode and len(daq_data[0]) % 16:
+    def update_cached_data(self, daq_data):
+        if len(daq_data[0]) % 16:
             self.time_cache += daq_data[0]
             self.demux_cache += daq_data[2]
             for idx in range(5):
                 self.tension_cache[idx].append(daq_data[1][idx])
-        else:
-            self.time_cache, self.tension_cache, self.demux_cache = daq_data
-            self.plot_tension_cache, self.plot_time_cache = self.tension_cache, self.time_cache
 
     def fetch_cached_data(self):
         return self.time_cache, self.tension_cache, self.demux_cache
 
-    def fetch_simulation_data(self, load_index):
-        self.loading_mode = True
-        daq_data = self.loader.load_save_for_ui(load_index)
-        self.update_cached_data(daq_data, loading_mode=True)
-        if len(self.demux_cache) >= 16:
-            self.update_thermistors_data(daq_data)
 
     def reset_data(self):
         self.time_cache = [[] for _ in range(5)]
@@ -428,13 +416,9 @@ class PowerMeter:
         return save_path_bits
 
     def get_port_values(self, port:DAQPort, daq_data: tuple):
-        if not self.loading_mode:
-            time_list, tension_list, demux_list = daq_data
-            bits_array = np.array(demux_list)
-            channel_data = np.array([time_list, tension_list[port.daq_port - 1]])
-        else:
-            full_time_array, full_tension_array, bits_array = daq_data
-            channel_data = np.vstack([full_time_array[:, port.daq_port - 1], full_tension_array[:, port.daq_port - 1]])
+        time_list, tension_list, demux_list = daq_data
+        bits_array = np.array(demux_list)
+        channel_data = np.array([time_list, tension_list[port.daq_port - 1]])
         if port.demux_port:
             mask = bits_array == port.demux_port
             channel_data = channel_data[:, mask]  # Apply the mask to the appropriate dimension (columns)
@@ -475,7 +459,7 @@ class PowerMeter:
                     maxfev=1000,
                 )
 
-                if popt[0] < 1:
+                if popt[0] < 0.6:
                     popt[1], popt[2] = 0, 0
                 else:
                     popt[1], popt[2] = np.dot(self.rotation_matrix, [popt[1] * self.factor, popt[2] * 1.8])
@@ -523,8 +507,12 @@ class PowerMeter:
             delta_t_array = np.array(self.delta_t_maxes_cache)
             p_mean = np.mean(delta_t_array * factor)
             delta_p = np.diff(delta_t_array * factor)
-            delta_t = np.diff(np.array(self.max_time_cache))
-            p_est = np.mean(delta_p/delta_t) * factor_2 + p_mean
+            delta_time = np.diff(self.max_time_cache)
+            # print("Current time array: ", self.max_time_cache)
+            # print("time_array len: ", len(self.max_time_cache))
+            # print("Current delta time array: ", delta_time)
+            # print("delta time shape: ", delta_time.shape)
+            p_est = np.mean(delta_p/delta_time) * factor_2 + p_mean
             if p_est < 0.06:
                 p_est = 0
         else:

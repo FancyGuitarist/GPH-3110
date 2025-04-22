@@ -8,6 +8,7 @@ from enum import StrEnum
 import matplotlib.colors as mcolors
 from packages.powermeter_functions import gaussian_2d, PowerMeter
 from packages.daq_reader import DAQReader
+from packages.daq_data_loader import  DAQLoader
 from PIL import Image, ImageTk
 from pathlib import Path
 from skimage.draw import disk
@@ -114,7 +115,7 @@ class PowerMeterUI(ctk.CTk):
         self.exam_mode = True
         self.power_meter = PowerMeter()
         self.daq_reader = DAQReader()
-        self.updating_plot = False
+        self.daq_loader = DAQLoader()
         self.reading_daq = False
         self.reading_save = False
 
@@ -154,12 +155,6 @@ class PowerMeterUI(ctk.CTk):
         self.geometry(f"{self.app_dims[0]}x{self.app_dims[1]}")
         self.minsize(750, 750)
         self.maxsize(750, 750)
-        if frame == self.frames[DAQReadingsWindow]:
-            print("Moving to DAQ Readings")
-            self.updating_plot = True
-            frame.update_plot()
-        else:
-            self.updating_plot = False
 
     def get_wavelength(self):
         return self.frames[MainWindow].wavelength_txt_box.get('1.0', tk.END)
@@ -188,8 +183,10 @@ class MainWindow(ctk.CTkFrame):
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
         self.power_meter = self.controller.power_meter
         self.daq_reader = self.controller.daq_reader
+        self.daq_loader = self.controller.daq_loader
         self.data_queue = Queue()
-        self.daq_thread = threading.Thread(target=self.read_daq_data_loop, daemon=True)
+        self.daq_thread = None
+        self.loader_thread = None
         self.resources_path = home_directory / "resources"
         self.mask_path = self.resources_path/ "Plate.png"
         self.on_img = ctk.CTkImage(Image.open(self.resources_path / "on-toggle.png"), size=(50, 50))
@@ -318,7 +315,7 @@ class MainWindow(ctk.CTkFrame):
 
         self.save_selector = ctk.CTkComboBox(
             self,
-            values = self.power_meter.loader.combobox_options + ["None"],
+            values = self.daq_loader.combobox_options + ["None"],
             font=self.text_font,
             dropdown_font=self.text_font,
             state="readonly",
@@ -596,7 +593,7 @@ class MainWindow(ctk.CTkFrame):
         if daq_data is not None:
             daq_data = self.power_meter.update_data(daq_data)
             params = self.power_meter.get_laser_params(daq_data)
-            self.estimated_power = self.power_meter.estimate_power(time.time(), params[0])
+            self.estimated_power = self.power_meter.estimate_power(daq_data[0][-1], params[0])
             temps = self.power_meter.get_temperature_values(daq_data)
         else:
             params = self.power_meter.laser_initial_guesses
@@ -694,11 +691,7 @@ class MainWindow(ctk.CTkFrame):
         else:
             threading.Thread(target=self.check_if_daq_connected).start()
             return
-        if self.activation_count == 0:
-            self.activation_count += 1
-        elif self.activation_count >= 1:
-            self.daq_thread = threading.Thread(target=self.read_daq_data_loop, daemon=True)
-            self.power_meter.start_time = time.time()
+        self.daq_thread = threading.Thread(target=self.read_daq_data_loop, daemon=True)
         self.controller.reading_daq = True
         self.daq_thread.start()
         self.update_status_txt_box("Acquisition en cours")
@@ -710,12 +703,11 @@ class MainWindow(ctk.CTkFrame):
 
 
     def stop_acquisition_daq(self):
-        self.controller.updating_plot = False
         self.controller.reading_daq = False
         self.updating_gradient = False
+        self.after(11)
         self.daq_thread.join()
         self.elapsed_time = self.current_acquisition_time
-        self.after(11)
         self.update_status_txt_box("Acquisition mise sur pause")
         self.daq_reader.stop_acquisition()
         self.start_acquisition_button.configure(state="normal")
@@ -744,13 +736,22 @@ class MainWindow(ctk.CTkFrame):
             print("file isn't saved yet")
             self.after(10)
         self.update_status_txt_box("Données actuelles enregistrées")
-        self.power_meter.loader.get_combobox_options()
-        self.save_selector.configure(values=self.power_meter.loader.combobox_options + ["None"])
+        self.daq_loader.get_combobox_options()
+        self.save_selector.configure(values=self.daq_loader.combobox_options + ["None"])
 
     def read_daq_data_loop(self):
         while self.controller.reading_daq:
             try:
                 daq_data = self.daq_reader.fetch_daq_data()
+                self.data_queue.put(daq_data)
+            except Exception as e:
+                print(f"Error reading DAQ: {e}")
+        time.sleep(0.001)
+
+    def load_data_loop(self):
+        while self.controller.reading_save:
+            try:
+                daq_data = self.daq_loader.load_save_for_ui()
                 self.data_queue.put(daq_data)
             except Exception as e:
                 print(f"Error reading DAQ: {e}")
@@ -768,8 +769,12 @@ class MainWindow(ctk.CTkFrame):
 
     def start_loading_data(self):
         self.controller.reading_save = True
-        self.power_meter.loader.load_index = 16
-        self.read_loaded_data()
+        self.daq_loader.load_index = 0
+        save_to_load = self.save_selector.get()
+        save_index = self.daq_loader.find_combobox_index(save_to_load)
+        self.daq_loader.set_save_index(save_index)
+        self.loader_thread = threading.Thread(target=self.load_data_loop, daemon=True)
+        self.loader_thread.start()
         self.updating_gradient = True
         self.load_button.configure(state="disabled")
         self.pause_loading_button.configure(state="normal")
@@ -779,15 +784,6 @@ class MainWindow(ctk.CTkFrame):
         self.updating_gradient = False
         self.load_button.configure(state="normal")
         self.pause_loading_button.configure(state="disabled")
-
-    def read_loaded_data(self):
-        if self.controller.reading_save:
-            save_to_load = self.save_selector.get()
-            load_index = self.power_meter.loader.find_combobox_index(save_to_load)
-            self.power_meter.fetch_simulation_data(load_index)
-            if self.controller.updating_plot:
-                self.controller.frames[DAQReadingsWindow].update_plot()
-            self.after(10, self.read_loaded_data)
 
 
 class DAQReadingsWindow(ctk.CTkFrame):
