@@ -1,3 +1,22 @@
+## [0.12.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.11.0...v0.12.0) (2025-04-23)
+
+
+### Features
+
+* plotting data for save ([c9930cb](https://github.com/FancyGuitarist/GPH-3110/commit/c9930cb50fa0f027794f7141e45515a644d9bf32))
+
+
+### Bug Fixes
+
+* bringing loading back ([00978d9](https://github.com/FancyGuitarist/GPH-3110/commit/00978d9858d1ddd672ba3ea40522d5ca4a90c95b))
+* fixing saving function for some reason ([0846fad](https://github.com/FancyGuitarist/GPH-3110/commit/0846faddcc11550e43bad7052da23d116fdad641))
+* now graph uses correct length all the time ([5a8c0a9](https://github.com/FancyGuitarist/GPH-3110/commit/5a8c0a959116b5ce8b2af3898e4dd13a8b27a5ad))
+* removed gradient and added exam mode ([af1e9e7](https://github.com/FancyGuitarist/GPH-3110/commit/af1e9e79043dc514d8066c6cd9ba40c31995be0b))
+* saving works again ([cb8ae8f](https://github.com/FancyGuitarist/GPH-3110/commit/cb8ae8f41542c01e45704700cbf36c75adda3ce2))
+* start of overhaul ([2fee5c6](https://github.com/FancyGuitarist/GPH-3110/commit/2fee5c606f54ef59333d00ebb84637523b2c11fe))
+* temp extrapolation ([9f0e09b](https://github.com/FancyGuitarist/GPH-3110/commit/9f0e09b027fd868ff98ed0a8d2c98f7b2a00f87c))
+* time, position, power and wavelength display ([4b98122](https://github.com/FancyGuitarist/GPH-3110/commit/4b98122fb0f97b3ace2c6fb54e0b14ab982f8c59))
+
 ## [0.11.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.10.0...v0.11.0) (2025-04-19)
 
 
