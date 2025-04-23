@@ -382,20 +382,12 @@ class PowerMeter:
         if len(self.demux_list) % 16 == 0:
             if len(self.demux_list) == 32:
                 self.time_list, self.tension_list, self.demux_list = self.slice_daq_data(self.time_list, self.tension_list, self.demux_list)
-            self.time_cache += daq_data[0]
-            self.demux_cache += daq_data[2]
+            self.time_cache += self.time_list
+            self.demux_cache += self.demux_list
             for idx in range(5):
-                self.tension_cache[idx].append(daq_data[1][idx])
+                self.tension_cache[idx]+=self.tension_list[idx]
 
         return self.time_list, self.tension_list, self.demux_list
-
-    def update_cached_data(self, daq_data):
-        # if len(daq_data[0]) % 16:
-        #     self.time_cache += daq_data[0]
-        #     self.demux_cache += daq_data[2]
-        #     for idx in range(5):
-        #         self.tension_cache[idx].append(daq_data[1][idx])
-        pass
 
     def fetch_cached_data(self):
         return self.time_cache, self.tension_cache, self.demux_cache
