@@ -13,8 +13,9 @@ class DAQLoader:
         self.save_folders = self.get_save_folders()
         self.combobox_options = self.get_combobox_options()
         self.load_cache = None
-        self.load_index = 16
+        self.load_index = 1
         self.test_mode = test_mode
+        self.save_index = 0
 
     def check_if_valid_folder(self, folder: Path):
         file_stems = [path.stem for path in folder.rglob('*.npy')]
@@ -48,21 +49,31 @@ class DAQLoader:
             self.load_cache = (index, time, tension, bits)
         return self.load_cache
 
-    def load_save_for_ui(self, index: int, looping=False):
-        _, time, tension, bits = self.load_save(index)
-        current_time = time[self.load_index - 16 :self.load_index, :]
-        current_tension = tension[self.load_index - 16 :self.load_index, :]
-        current_bit = bits[self.load_index - 16 :self.load_index]
-        if self.load_index == bits.shape[0] - 1:
-            if looping:
-                self.load_index = 0
-            else:
-                self.load_index = bits.shape[0] - 1
-        elif 16 > bits.shape[0] - self.load_index:
+    def set_save_index(self, save_index: int):
+        self.save_index = save_index
+        return self.save_index
+
+    def load_save_for_ui(self, looping=False):
+        _, time, tension, bits = self.load_save(self.save_index)
+
+        # Ensure data exists
+        if bits.shape[0] == 0:
+            print("Error: No data in loaded save.")
+            return None  # Or handle gracefully
+
+        if self.load_index >= bits.shape[0]:  # Prevent index out-of-bounds
             self.load_index = bits.shape[0] - 1
+
+        current_time = time[self.load_index - 1:self.load_index, 0]
+        current_tension = tension[self.load_index - 1:self.load_index, :]
+        current_bit = bits[self.load_index - 1:self.load_index]
+
+        if self.load_index == bits.shape[0] - 1:
+            self.load_index = 1 if looping else bits.shape[0] - 1
         else:
-            self.load_index += 16
-        return current_time, current_tension, current_bit
+            self.load_index += 1
+        print(current_time[0], current_tension[0], current_bit[0])
+        return current_time[0], current_tension[0], current_bit[0]
 
 
 
