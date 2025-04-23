@@ -7,7 +7,7 @@ from packages.daq_data_loader import DAQLoader
 from packages.powermeter_functions import DAQPort, Thermistor, PowerMeter
 import matplotlib.pyplot as plt
 
-file_to_load = "QcWatt_2025-04-18_09_53_57"
+file_to_load = "QcWatt_2025-04-22_23_42_57"
 file_to_load = file_to_load.replace("QcWatt_", "")
 
 r_out, r_int = 13.97, 5
@@ -59,12 +59,16 @@ plate_thermistors[plate_ref_port] = Thermistor((0, 0), plate_ref_port, calibrati
 loader = DAQLoader()
 save_folders = loader.get_save_folders()
 index_to_load = loader.find_combobox_index(file_to_load)
-print([path.stem for path in save_folders])
+# print([path.stem for path in save_folders])
 
 save = list(loader.load_save(index_to_load))
 print(save)
 save = save[1:]
-save[0] = save[0][:, 0].tolist()
+print(save[0].ndim)
+if save[0].ndim == 2:
+    save[0] = save[0][:, 0].tolist()
+else:
+    save[0] = save[0].tolist()
 save[1] = np.swapaxes(save[1], 0, 1).tolist()
 save[2] = save[2].tolist()
 max_len = len(save[0])
