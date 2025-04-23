@@ -182,7 +182,7 @@ class Thermistor:
         calibration_data = self.get_calibration_data()
         return np.interp(V_m, calibration_data[:, 1], calibration_data[:, 0])
 
-    def get_temperature(self):
+    def get_temperature(self, mean=True):
         """
         Function to convert Thermistor's current tension values into a temperature value
         :return: Temperature value
@@ -197,7 +197,10 @@ class Thermistor:
         else:
             temp_transfer_func = self.extrapolate_w_transfer_function(V_m_transfer_func)
         temp = np.hstack([temp_calibration, temp_transfer_func])
-        return np.nan_to_num(np.mean(temp))
+        if mean:
+            return np.nan_to_num(np.mean(temp))
+        else:
+            return np.nan_to_num(temp)
 
 
 class GlassType(StrEnum):
@@ -379,15 +382,20 @@ class PowerMeter:
         if len(self.demux_list) % 16 == 0:
             if len(self.demux_list) == 32:
                 self.time_list, self.tension_list, self.demux_list = self.slice_daq_data(self.time_list, self.tension_list, self.demux_list)
-
-        return self.time_list, self.tension_list, self.demux_list
-
-    def update_cached_data(self, daq_data):
-        if len(daq_data[0]) % 16:
             self.time_cache += daq_data[0]
             self.demux_cache += daq_data[2]
             for idx in range(5):
                 self.tension_cache[idx].append(daq_data[1][idx])
+
+        return self.time_list, self.tension_list, self.demux_list
+
+    def update_cached_data(self, daq_data):
+        # if len(daq_data[0]) % 16:
+        #     self.time_cache += daq_data[0]
+        #     self.demux_cache += daq_data[2]
+        #     for idx in range(5):
+        #         self.tension_cache[idx].append(daq_data[1][idx])
+        pass
 
     def fetch_cached_data(self):
         return self.time_cache, self.tension_cache, self.demux_cache

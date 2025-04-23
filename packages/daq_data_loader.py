@@ -27,7 +27,7 @@ class DAQLoader:
         for folder in folders:
             if self.check_if_valid_folder(folder):
                 self.save_folders.append(folder)
-        return self.save_folders
+        return sorted(self.save_folders)
 
     def get_combobox_options(self):
         self.combobox_options = []
