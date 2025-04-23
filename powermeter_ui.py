@@ -3,9 +3,12 @@ import customtkinter as ctk
 import numpy as np
 import time
 import threading
+from queue import Queue
 from enum import StrEnum
 import matplotlib.colors as mcolors
 from packages.powermeter_functions import gaussian_2d, PowerMeter
+from packages.daq_reader import DAQReader
+from packages.daq_data_loader import  DAQLoader
 from PIL import Image, ImageTk
 from pathlib import Path
 from skimage.draw import disk
@@ -109,14 +112,24 @@ class PowerMeterUI(ctk.CTk):
         self.maxsize(self.system_width, self.system_height)
 
         # Variables to be shared between frames
+        self.exam_mode = True
         self.power_meter = PowerMeter()
-        self.updating_plot = False
+        self.daq_reader = DAQReader()
+        self.daq_loader = DAQLoader()
         self.reading_daq = False
         self.reading_save = False
 
-        self.fig, self.ax = plt.subplots()
-        self.ax.set_ylim(-1, 6)  # Adjust as needed
-        self.lines = [self.ax.plot([], [])[0] for _ in range(5)]
+        self.fig, self.ax = plt.subplots(figsize=(6, 4))
+        # self.fig.tight_layout()  # Adjust layout to prevent clipping
+        self.ax.set_title("Puissance en temps réel")
+        self.ax.set_xlabel("Temps (s)")
+        self.ax.set_ylabel("Puissance (W)")
+        self.line, = self.ax.plot([], [], 'r-')  # Initialize an empty line
+
+        # Initialize data for the plot
+        self.plot_power_data = []
+        self.plot_time_data = []
+
         self.app_dims = (750, 750)
 
 
@@ -150,12 +163,6 @@ class PowerMeterUI(ctk.CTk):
         self.geometry(f"{self.app_dims[0]}x{self.app_dims[1]}")
         self.minsize(750, 750)
         self.maxsize(750, 750)
-        if frame == self.frames[DAQReadingsWindow]:
-            print("Moving to DAQ Readings")
-            self.updating_plot = True
-            frame.update_plot()
-        else:
-            self.updating_plot = False
 
     def get_wavelength(self):
         return self.frames[MainWindow].wavelength_txt_box.get('1.0', tk.END)
@@ -183,6 +190,11 @@ class MainWindow(ctk.CTkFrame):
         self.toggle_font = ctk.CTkFont(family="Times New Roman", size=18, weight="bold")
         self.text_font = ctk.CTkFont(family="Times New Roman", size=15)
         self.power_meter = self.controller.power_meter
+        self.daq_reader = self.controller.daq_reader
+        self.daq_loader = self.controller.daq_loader
+        self.data_queue = Queue()
+        self.daq_thread = None
+        self.loader_thread = None
         self.resources_path = home_directory / "resources"
         self.mask_path = self.resources_path/ "Plate.png"
         self.on_img = ctk.CTkImage(Image.open(self.resources_path / "on-toggle.png"), size=(50, 50))
@@ -192,9 +204,10 @@ class MainWindow(ctk.CTkFrame):
         self.manual_wavelength = ctk.StringVar()
         self.plate_mask_cache, self.circular_mask_cache = None, None
         self.img_tk = None
+        self.canvas_background = (np.ones((350, 400, 3)) * UIColors.LightGray.rgb_value).astype(np.uint8)
         self.X, self.Y = np.meshgrid(np.linspace(-13.97, 13.97, 400), np.linspace(-13.97, 13.97, 350))
-        self.estimated_power = 0
         self.activation_count = 0
+        self.power_values = [[], []]
         self.elapsed_time = 0
         self.current_acquisition_time = 0
         self.updating_gradient = False
@@ -206,7 +219,7 @@ class MainWindow(ctk.CTkFrame):
             width=200,
             height=20,
             corner_radius=10,
-            font=self.text_font,
+            font=self.label_font,
             bg_color=UIColors.White,
             fg_color=UIColors.LightGray,
             text_color=UIColors.Black,
@@ -310,7 +323,7 @@ class MainWindow(ctk.CTkFrame):
 
         self.save_selector = ctk.CTkComboBox(
             self,
-            values = self.power_meter.loader.combobox_options + ["None"],
+            values = self.daq_loader.combobox_options + ["None"],
             font=self.text_font,
             dropdown_font=self.text_font,
             state="readonly",
@@ -470,11 +483,12 @@ class MainWindow(ctk.CTkFrame):
         self.start_acquisition_button.place(relx=self.controller.relx_pos(190), rely=self.controller.rely_pos(575), anchor=ctk.NW)
         self.save_data_button.place(relx=self.controller.relx_pos(280), rely=self.controller.rely_pos(625), anchor=ctk.NW)
         self.reset_data_button.place(relx=self.controller.relx_pos(280), rely=self.controller.rely_pos(675), anchor=ctk.NW)
-        selector_pos = (530, 50)
-        self.save_selector.place(relx=self.controller.relx_pos(selector_pos[0]), rely=self.controller.rely_pos(selector_pos[1]), anchor=ctk.NW)
-        self.save_selector_label.place(relx=self.controller.relx_pos(selector_pos[0] + 10), rely=self.controller.rely_pos(selector_pos[1] - 30), anchor=ctk.NW)
-        self.load_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 50), anchor=ctk.NW)
-        self.pause_loading_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 100), anchor=ctk.NW)
+        if not self.controller.exam_mode:
+            selector_pos = (530, 50)
+            self.save_selector.place(relx=self.controller.relx_pos(selector_pos[0]), rely=self.controller.rely_pos(selector_pos[1]), anchor=ctk.NW)
+            self.save_selector_label.place(relx=self.controller.relx_pos(selector_pos[0] + 10), rely=self.controller.rely_pos(selector_pos[1] - 30), anchor=ctk.NW)
+            self.load_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 50), anchor=ctk.NW)
+            self.pause_loading_button.place(relx=self.controller.relx_pos(selector_pos[0] - 5), rely=self.controller.rely_pos(selector_pos[1] + 100), anchor=ctk.NW)
         self.position_label.place(relx=self.controller.relx_pos(540), rely=self.controller.rely_pos(350), anchor=ctk.NW)
         self.time_label.place(relx=self.controller.relx_pos(230), rely=self.controller.rely_pos(525), anchor=ctk.NW)
         self.status_border_frame.place(relx=self.controller.relx_pos(self.status_placement[0]), rely=self.controller.rely_pos(self.status_placement[1]) , anchor=ctk.NW)
@@ -490,12 +504,26 @@ class MainWindow(ctk.CTkFrame):
                                        rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
         self.manual_label.place(relx=self.controller.relx_pos(toggle_pos[0] + 68),
                                  rely=self.controller.rely_pos(toggle_pos[1] + 14), anchor=ctk.NW)
-        self.update_gradient()
-        threading.Thread(target=self.update_power_and_wavelength).start()
+        gradient_result = self.calculate_gradient()
+        self.update_gradient(gradient_result)
+        self.setup_canvas_image()
+
+        self.fig, self.ax = self.controller.fig, self.controller.ax
+        # self.fig.set_size_inches(3, 2)  # Adjust to your desired dimensions
+        # self.fig.set_dpi(100)  # Optional: Adjust resolution for clarity
+
+        self.line = self.controller.line
+        self.plot_power_data, self.plot_time_data = self.controller.plot_power_data, self.controller.plot_time_data
+
+        # Embed the plot into the Tkinter Frame
+        self.plot_canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.plot_canvas.get_tk_widget().place(relx=self.controller.relx_pos(200),
+                                               rely=self.controller.rely_pos(75), anchor=ctk.NW)
         threading.Thread(target=self.check_if_daq_connected).start()
+        self.after(10, self.update_from_queue)
 
     def check_if_daq_connected(self):
-        if self.power_meter.device_detected():
+        if self.daq_reader.device_detected():
             self.update_status_txt_box("Prêt à lancer l'acquisition")
             self.start_acquisition_button.configure(state="normal")
         else:
@@ -523,25 +551,21 @@ class MainWindow(ctk.CTkFrame):
         else:
             self.power_meter.manual_wavelength = int(wavelength_txt)
 
-    def update_power_and_wavelength(self):
+    def update_power_and_wavelength(self, power, wavelength):
         """
         Updates the power and wavelength values in the UI at a frequency of 30 Hz.
         """
-        interval = 1 / 15
-        while True:
-            """ Will read values from DAQ in future update """
-            power, wavelength = self.estimated_power, self.power_meter.get_wavelength()
+        if self.controller.reading_daq:
+            print("Current Power and Wavelength: ", power, wavelength)
             self.power_txt_box.update_text_box(f"{power}")
             self.wavelength_txt_box.update_text_box(f"{wavelength}")
-            time.sleep(interval)
 
     def get_plate_mask_array(self):
-        x_dim = 340  # Define width
-        y_dim = 316 # Define height
-        pad_y = (350 - y_dim) // 2  # Center vertically by evenly distributing padding
-        pad_x = (400 - x_dim) // 2  # Center horizontally by evenly distributing padding
-
         if self.plate_mask_cache is None:
+            x_dim = 340  # Define width
+            y_dim = 316  # Define height
+            pad_y = (350 - y_dim) // 2  # Center vertically by evenly distributing padding
+            pad_x = (400 - x_dim) // 2  # Center horizontally by evenly distributing padding
             mask_img = Image.open(self.mask_path).rotate(30, expand=1)  # Rotate as needed
             mask_img = mask_img.resize((x_dim, y_dim))  # Resize the mask
             mask_array = np.array(mask_img.convert("RGB"))
@@ -556,36 +580,45 @@ class MainWindow(ctk.CTkFrame):
 
     def get_circular_mask_array(self):
         if self.circular_mask_cache is None:
-            self.circular_mask_cache = np.zeros((350, 400, 3), dtype=np.uint8)
+            circular_mask = np.zeros((350, 400, 3), dtype=np.uint8)
             rr, cc = disk((180, 200), 90)
-            self.circular_mask_cache[rr, cc, :] = 1
+            circular_mask[rr, cc, :] = 1
+            self.circular_mask_cache = circular_mask, np.invert(circular_mask.astype(np.bool))
         return self.circular_mask_cache
 
     def apply_masks_to_gradient(self, img_array):
-        circular_mask_array = self.get_circular_mask_array()
-        background = (
-            np.invert(circular_mask_array.astype(np.bool)) * UIColors.White.rgb_value
-        )
-        masked_array = (
-            img_array * circular_mask_array + background
-        ) * self.get_plate_mask_array()
+        circular_mask_array, inverse_circular_mask = self.get_circular_mask_array()
+        background = inverse_circular_mask * UIColors.White.rgb_value
+        masked_array = (img_array * circular_mask_array + background) * self.get_plate_mask_array()
         return masked_array
 
     def update_position_and_time_ui(self, x0, y0):
         if self.controller.reading_daq:
             position_text = "Position actuelle:" + "\n" + f"x: {x0:.2f} mm" + "\n" + f"y: {y0:.2f} mm"
-            if self.power_meter.start_time is None:
+            if self.daq_reader.start_time is None:
                 self.current_acquisition_time = 0
             else:
-                self.current_acquisition_time = time.time() - self.power_meter.start_time + self.elapsed_time
+                self.current_acquisition_time = time.time() - self.daq_reader.start_time + self.elapsed_time
             time_text = "Durée de l'enregistrement: " + f"{self.current_acquisition_time:.2f} sec"
             self.position_label.configure(text=position_text)
             self.time_label.configure(text=time_text)
 
-    def update_gradient(self):
-        params = self.power_meter.get_laser_params()
-        A, x0, y0, _, _ = params
-        self.estimated_power = self.power_meter.estimate_power(time.time(), A)
+    def setup_canvas_image(self):
+        img_array = self.apply_masks_to_gradient(self.canvas_background)
+        img = Image.fromarray(img_array)
+        self.img_tk = ImageTk.PhotoImage(img)
+        self.canvas.itemconfig(self.image_id, image=self.img_tk)
+
+    def calculate_gradient(self, daq_data=None):
+        if daq_data is not None:
+            daq_data = self.power_meter.update_data(daq_data)
+            params = self.power_meter.get_laser_params(daq_data)
+            estimated_power = self.power_meter.estimate_power(daq_data[0][-1], params[0])
+            temps = self.power_meter.get_temperature_values(daq_data)
+        else:
+            params = self.power_meter.laser_initial_guesses
+            estimated_power = 0
+            temps = [0 for _ in range(len(self.power_meter.ports))]
         self.update_position_and_time_ui(params[1], params[2])
         Z = np.flip(gaussian_2d((self.X, self.Y), *params), axis=0)
 
@@ -593,79 +626,65 @@ class MainWindow(ctk.CTkFrame):
         norm = mcolors.Normalize(vmin=np.min(Z), vmax=np.max(Z))
         colormap = plt.get_cmap("hot")
 
-        # Convert the Gaussian values to RGB colors
-        img_array = (colormap(norm(Z))[:, :, :3] * 255).astype(np.uint8)
-        # img_array = np.ones((350, 400, 3), dtype=np.uint8) * UIColors.White.rgb_value
-        img_array = self.apply_masks_to_gradient(img_array)
-
-        # Convert to PIL Image
-        img = Image.fromarray(img_array)
-
         # Convert to Tkinter-compatible format
-        self.img_tk = ImageTk.PhotoImage(img)
+        return norm, colormap, (params[1], params[2]), temps, estimated_power
 
-        # Update the label's image
-        self.canvas.itemconfig(self.image_id, image=self.img_tk)
+    def update_gradient(self, gradient_result):
+        norm, colormap, current_pos, temps, estimated_power = gradient_result
+        self.update_power_and_wavelength(estimated_power, 976)
+        if self.daq_reader.start_time is not None:
+            self.update_plot(power=estimated_power, time=self.daq_reader.start_time - time.time())
 
-        self.draw_overlay_shapes(norm, colormap, (params[1], params[2]))
+        self.draw_overlay_shapes(norm, colormap, current_pos, temps)
 
-        # Schedule next update (simulate real-time data)
-        if self.updating_gradient:
-            self.canvas.after(10, self.update_gradient)  # Update every second
+    def ui_updates_async(self, daq_data):
+        def worker():
+            gradient_result = self.calculate_gradient(daq_data)
+            self.after(0, lambda: self.update_gradient(gradient_result))
+        threading.Thread(target=worker, daemon=True).start()
 
-    def get_ui_thermistance_positions(self):
+    def get_ui_thermistor_positions(self):
         positions = np.array(self.power_meter.xy_coords)
         r_out = self.power_meter.r_out
-        positions[0, :] += r_out
-        positions[1, :] = np.abs(positions[1, :] - r_out)
-        positions /= r_out * 2
-        positions[0, :] *= 200
-        positions[1, :] *= 175
-        positions[0, :] += 100
-        positions[1, :] += 92.5
+        positions[0, :] = ((positions[0, :] + r_out) / (r_out * 2)) * 200 + 100
+        positions[1, :] = (np.abs(positions[1, :] - r_out) / (r_out * 2)) * 175 + 92.5
         return positions
 
     def convert_radial_to_ui_pos(self, pos):
         x, y = pos
         r_out = self.power_meter.r_out
-        x += r_out
-        y -= r_out
-        x = x / (r_out * 2)
-        y = abs(y) / (r_out * 2)
-        x, y = (x * 200) + 100, (y * 175) + 92.5
+        x = ((x + r_out) / (r_out * 2)) * 200 + 100
+        y = (abs(y - r_out) / (r_out * 2)) * 175 + 92.5
         return x, y
 
-    def draw_overlay_shapes(self, norm, colormap, current_pos):
+    def draw_overlay_shapes(self, norm, colormap, current_pos, temps):
         """Draw circles or other shapes on top of the heatmap"""
-        self.canvas.delete("overlay")  # Remove previous shapes
-        x, y = self.convert_radial_to_ui_pos(current_pos)
-        temps = self.power_meter.get_temperature_values()
-        positions = self.get_ui_thermistance_positions()
-        self.canvas.create_oval(
-            x - 10,
-            y - 10,
-            x + 10,
-            y + 10,
-            fill="Red",
-            outline="Black",
-            width=2,
-            tags="overlay",
-        )
+        if not hasattr(self, "overlay_shapes_initialized"):
+            # Initialize once
+            self.first_oval = self.canvas.create_oval(
+                0, 0, 0, 0, fill="Red", outline="Black", width=2, tags="overlay"
+            )
+            self.other_ovals = []
+            positions = self.get_ui_thermistor_positions()
+            for index in range(len(positions[0])):
+                x, y = positions[:, index]
+                oval = self.canvas.create_oval(
+                    x - 5, y - 5, x + 5, y + 5,
+                    fill="Black", outline="Black", width=2, tags="overlay"
+                )
+                self.other_ovals.append(oval)
+            self.overlay_shapes_initialized = True
 
-        for index in range(len(temps)):
-            x, y = positions[:, index]
+        # Update the position and color of the first oval
+        x, y = self.convert_radial_to_ui_pos(current_pos)
+        self.canvas.coords(self.first_oval, x - 10, y - 10, x + 10, y + 10)
+
+        # Update colors of the other ovals
+        for index, oval in enumerate(self.other_ovals):
             current_color = colormap(norm(temps[index]))
             current_color_hex = mcolors.rgb2hex(current_color)
-            self.canvas.create_oval(
-                x - 5,
-                y - 5,
-                x + 5,
-                y + 5,
-                fill=str(current_color_hex),
-                outline="Black",
-                width=2,
-                tags="overlay",
-            )
+            self.canvas.itemconfig(oval, fill=str(current_color_hex))
+
     # Toggle command
     def update_toggle_state(self):
         match self.toggle_state.get():
@@ -689,35 +708,30 @@ class MainWindow(ctk.CTkFrame):
         self.status_label.configure(text=text, justify="center")
 
     def start_acquisition_daq(self):
-        if self.power_meter.device_detected():
-            self.power_meter.start_acquisition()
+        if self.daq_reader.device_detected():
+            self.daq_reader.start_acquisition()
         else:
             threading.Thread(target=self.check_if_daq_connected).start()
             return
-        if self.activation_count == 0:
-            self.read_daq_data()
-            self.activation_count += 1
-        elif self.activation_count >= 1:
-            self.power_meter.start_time = time.time()
+        self.daq_thread = threading.Thread(target=self.read_daq_data_loop, daemon=True)
+        self.controller.reading_daq = True
+        self.daq_thread.start()
         self.update_status_txt_box("Acquisition en cours")
-        self.updating_gradient = True
-        threading.Thread(target=self.update_gradient).start()
         self.start_acquisition_button.configure(state="disabled")
         self.stop_acquisition_button.configure(state="normal")
         self.daq_display_button.configure(state="normal")
         self.save_data_button.configure(state="disabled")
         self.reset_data_button.configure(state="disabled")
-        self.controller.reading_daq = True
 
 
     def stop_acquisition_daq(self):
-        self.controller.updating_plot = False
         self.controller.reading_daq = False
         self.updating_gradient = False
-        self.elapsed_time = self.current_acquisition_time
         self.after(11)
+        self.daq_thread.join()
+        self.elapsed_time = self.current_acquisition_time
         self.update_status_txt_box("Acquisition mise sur pause")
-        self.power_meter.stop_acquisition()
+        self.daq_reader.stop_acquisition()
         self.start_acquisition_button.configure(state="normal")
         self.stop_acquisition_button.configure(state="disabled")
         self.daq_display_button.configure(state="disabled")
@@ -726,7 +740,7 @@ class MainWindow(ctk.CTkFrame):
 
     def reset_data(self):
         self.power_meter.reset_data()
-        self.power_meter.start_time = None
+        self.daq_reader.start_time = None
         self.current_acquisition_time = 0
         self.elapsed_time = 0
         self.controller.reading_daq = True
@@ -740,25 +754,50 @@ class MainWindow(ctk.CTkFrame):
 
     def save_data(self):
         save_path = self.power_meter.save_current_data()
-        print(save_path.exists())
         while not save_path.exists():
             print("file isn't saved yet")
             self.after(10)
         self.update_status_txt_box("Données actuelles enregistrées")
-        self.power_meter.loader.get_combobox_options()
-        self.save_selector.configure(values=self.power_meter.loader.combobox_options + ["None"])
+        self.daq_loader.get_combobox_options()
+        self.save_selector.configure(values=self.daq_loader.combobox_options + ["None"])
 
-    def read_daq_data(self):
-        if self.controller.reading_daq:
-            self.controller.lines = self.power_meter.fetch_daq_data()
-        self.after(1, self.read_daq_data)
+    def read_daq_data_loop(self):
+        while self.controller.reading_daq:
+            try:
+                daq_data = self.daq_reader.fetch_daq_data()
+                self.data_queue.put(daq_data)
+            except Exception as e:
+                print(f"Error reading DAQ: {e}")
+        time.sleep(0.001)
+
+    def load_data_loop(self):
+        while self.controller.reading_save:
+            try:
+                daq_data = self.daq_loader.load_save_for_ui()
+                self.data_queue.put(daq_data)
+            except Exception as e:
+                print(f"Error reading DAQ: {e}")
+        time.sleep(0.001)
+
+    def update_from_queue(self):
+        try:
+            while not self.data_queue.empty():
+                daq_data = self.data_queue.get_nowait()
+                self.ui_updates_async(daq_data)
+        except Exception as e:
+            print(f"Error updating UI: {e}")
+        finally:
+            self.after(10, self.update_from_queue)
 
     def start_loading_data(self):
         self.controller.reading_save = True
-        self.power_meter.loader.load_index = 16
-        self.read_loaded_data()
+        self.daq_loader.load_index = 0
+        save_to_load = self.save_selector.get()
+        save_index = self.daq_loader.find_combobox_index(save_to_load)
+        self.daq_loader.set_save_index(save_index)
+        self.loader_thread = threading.Thread(target=self.load_data_loop, daemon=True)
+        self.loader_thread.start()
         self.updating_gradient = True
-        threading.Thread(target=self.update_gradient).start()
         self.load_button.configure(state="disabled")
         self.pause_loading_button.configure(state="normal")
 
@@ -768,14 +807,29 @@ class MainWindow(ctk.CTkFrame):
         self.load_button.configure(state="normal")
         self.pause_loading_button.configure(state="disabled")
 
-    def read_loaded_data(self):
-        if self.controller.reading_save:
-            save_to_load = self.save_selector.get()
-            load_index = self.power_meter.loader.find_combobox_index(save_to_load)
-            self.controller.lines = self.power_meter.fetch_simulation_data(load_index, self.controller.lines)
-            if self.controller.updating_plot:
-                self.controller.frames[DAQReadingsWindow].update_plot()
-            self.after(10, self.read_loaded_data)
+    def update_plot(self, time, power):
+        """Update the real-time plot with new x and y values."""
+        self.plot_time_data.append(time)
+        self.plot_power_data.append(power)
+
+        # Limit the number of points displayed
+        if len(self.plot_time_data) > 100:
+            self.plot_time_data.pop(0)
+            self.plot_power_data.pop(0)
+
+        # Update the line data
+        self.line.set_data(self.plot_time_data, self.plot_power_data)
+        self.ax.relim()  # Recalculate limits
+        self.ax.autoscale_view()  # Autoscale the view
+        self.plot_canvas.draw()  # Redraw the canvas
+
+    def clear_plot(self):
+        """Clear the plot data."""
+        self.plot_time_data.clear()
+        self.plot_power_data.clear()
+        self.line.set_data([], [])
+        self.ax.relim()
+        self.ax.autoscale_view()
 
 
 class DAQReadingsWindow(ctk.CTkFrame):
@@ -807,21 +861,37 @@ class DAQReadingsWindow(ctk.CTkFrame):
 
         # Create the plot
         self.fig, self.ax = self.controller.fig, self.controller.ax
-        self.lines = self.controller.lines
+        self.line = self.controller.line
+        self.plot_power_data, self.plot_time_data = self.controller.plot_power_data, self.controller.plot_time_data
 
         # Embed the plot into the Tkinter Frame
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.plot_canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.plot_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         self.show_main_window_button.pack()
 
+    def update_plot(self, time, power):
+        """Update the real-time plot with new x and y values."""
+        self.plot_time_data.append(time)
+        self.plot_power_data.append(power)
 
-    def update_plot(self):
-        """
-        Function to update the DAQ readings and refresh the plot.
-        """
+        # Limit the number of points displayed
+        if len(self.plot_time_data) > 100:
+            self.plot_time_data.pop(0)
+            self.plot_power_data.pop(0)
+
+        # Update the line data
+        self.line.set_data(self.plot_time_data, self.plot_power_data)
+        self.ax.relim()  # Recalculate limits
+        self.ax.autoscale_view()  # Autoscale the view
+        self.plot_canvas.draw()  # Redraw the canvas
+
+    def clear_plot(self):
+        """Clear the plot data."""
+        self.plot_time_data.clear()
+        self.plot_power_data.clear()
+        self.line.set_data([], [])
         self.ax.relim()
         self.ax.autoscale_view()
-        self.canvas.draw()
 
 
 if __name__ == "__main__":
