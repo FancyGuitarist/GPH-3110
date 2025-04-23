@@ -211,7 +211,7 @@ class MainWindow(ctk.CTkFrame):
             width=200,
             height=20,
             corner_radius=10,
-            font=self.text_font,
+            font=self.label_font,
             bg_color=UIColors.White,
             fg_color=UIColors.LightGray,
             text_color=UIColors.Black,

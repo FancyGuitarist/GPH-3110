@@ -462,7 +462,7 @@ class PowerMeter:
                 if popt[0] < 0.6:
                     popt[1], popt[2] = 0, 0
                 else:
-                    popt[1], popt[2] = np.dot(self.rotation_matrix, [popt[1] * self.factor, popt[2] * 1.8])
+                    popt[1], popt[2] = np.dot(self.rotation_matrix, [popt[1] * self.factor, popt[2] * 1.5])
                 self.laser_params = popt
                 if abs(popt[1]) < 15 and abs(popt[2]) < 15:
                     self.laser_initial_guesses = self.laser_params
@@ -472,8 +472,8 @@ class PowerMeter:
                 print("Couldn't fit data")
                 self.laser_params = self.laser_initial_guesses
         else:
-            print("Daq data isn't of length 16 yet")
             self.laser_params = self.laser_initial_guesses
+        print("Current A: ", self.laser_params[0])
         return self.laser_params
 
     def n_glasses(self, lambda_: float):
