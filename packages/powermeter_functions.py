@@ -154,7 +154,6 @@ class Thermistor:
         :return: two arrays, one for calibration and the other for transfer function use.
         """
         cutoff_val = np.max(self.get_calibration_data()[:, 1])
-        print("Cutoff value:", cutoff_val)
         calibration_mask = V_m <= cutoff_val
         V_m_calibration = V_m[calibration_mask]
         V_m_transfer_func = V_m[~calibration_mask]
@@ -198,7 +197,6 @@ class Thermistor:
             temp_transfer_func = self.extrapolate_w_transfer_function(V_m_transfer_func)
         else:
             temp_transfer_func = None
-        # temp = np.hstack([temp_calibration, temp_transfer_func])
         temp[calibration_mask] = temp_calibration
         temp[~calibration_mask] = temp_transfer_func
         if mean:

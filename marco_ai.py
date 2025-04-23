@@ -87,24 +87,21 @@ powermeter_thermistors.update(glass_3_thermistors)
 powermeter_temperatures = {"Time": np.array(save[0])}
 for port, thermistor in powermeter_thermistors.items():
     port_values = powermeter.get_port_values(port, save)
-    # print(np.mean(np.diff(port_values[0])))
     thermistor.add_data(port_values)
     if len(port_values[0]) < max_len:
         initial_temps = thermistor.get_temperature(mean=False)
         temps = np.repeat(initial_temps, 16)[:max_len]
-        # temps = np.zeros(max_len, dtype=initial_temps.dtype)
-        # temps[::16] = initial_temps
     else:
         temps = thermistor.get_temperature(mean=False)
-    powermeter_temperatures[port] = temps[:13040]
+    powermeter_temperatures[port] = temps[:max_len]
 
-print([t.shape for t in powermeter_temperatures.values()])
-time = powermeter_temperatures["Time"][:13040]
+time = powermeter_temperatures["Time"][:len(powermeter_temperatures[DAQPort("5.13")])]
 plt.figure(figsize=(10, 6))
 
 # Plot each port
 for port, temps in powermeter_temperatures.items():
     if port != "Time":
+        temps = temps[:len(powermeter_temperatures[DAQPort("5.13")])]
         plt.plot(time, temps, label=port)
 
 # Add labels, title, legend
