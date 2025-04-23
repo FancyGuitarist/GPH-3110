@@ -7,7 +7,7 @@ from packages.daq_data_loader import DAQLoader
 from packages.powermeter_functions import DAQPort, Thermistor, PowerMeter
 import matplotlib.pyplot as plt
 
-file_to_load = "QcWatt_2025-04-22_23_42_57"
+file_to_load = "QcWatt_Test_echelons_976_20250410_085523"
 file_to_load = file_to_load.replace("QcWatt_", "")
 
 r_out, r_int = 13.97, 5
@@ -96,10 +96,10 @@ for port, thermistor in powermeter_thermistors.items():
         # temps[::16] = initial_temps
     else:
         temps = thermistor.get_temperature(mean=False)
-    powermeter_temperatures[port] = temps[:4464]
+    powermeter_temperatures[port] = temps[:13040]
 
 print([t.shape for t in powermeter_temperatures.values()])
-time = powermeter_temperatures["Time"][:4464]
+time = powermeter_temperatures["Time"][:13040]
 plt.figure(figsize=(10, 6))
 
 # Plot each port

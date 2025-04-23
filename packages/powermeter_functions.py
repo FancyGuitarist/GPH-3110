@@ -153,11 +153,12 @@ class Thermistor:
         :param V_m: Array of the Thermistor's tension values
         :return: two arrays, one for calibration and the other for transfer function use.
         """
-        cutoff_val = self.get_calibration_data()[1].max()
+        cutoff_val = np.max(self.get_calibration_data()[:, 1])
+        print("Cutoff value:", cutoff_val)
         calibration_mask = V_m <= cutoff_val
         V_m_calibration = V_m[calibration_mask]
         V_m_transfer_func = V_m[~calibration_mask]
-        return V_m_calibration, V_m_transfer_func
+        return V_m_calibration, V_m_transfer_func, calibration_mask
 
     def extrapolate_w_transfer_function(self, V_m):
         """
@@ -171,7 +172,7 @@ class Thermistor:
         G_a, G_ap, X_c = params_dict['G_a'], params_dict['G_ap'], params_dict['X_c']
         V_m = (V_m - G_a * X_c + G_ap * X_c) / G_ap
         x = np.log(1000 * ((130 - 230 * (V_m / V_s)) / (10 + 23 * (V_m / V_s)) - R_m))
-        return 1 / (A + B * x + C * x ** 2 + D * x ** 3)
+        return 1 / (A + B * x + C * x ** 2 + D * x ** 3) - 273.15
 
     def extrapolate_w_calibration_data(self, V_m):
         """
@@ -190,13 +191,16 @@ class Thermistor:
         if self.no_data():
             return 0
         V_m = self.data[1]
-        V_m_calibration, V_m_transfer_func = self.split_extrapolation_array(V_m)
+        temp = np.zeros_like(V_m)
+        V_m_calibration, V_m_transfer_func, calibration_mask = self.split_extrapolation_array(V_m)
         temp_calibration = self.extrapolate_w_calibration_data(V_m_calibration)
-        if not np.any(V_m_transfer_func):
-            temp_transfer_func = np.array([])
-        else:
+        if np.any(V_m_transfer_func):
             temp_transfer_func = self.extrapolate_w_transfer_function(V_m_transfer_func)
-        temp = np.hstack([temp_calibration, temp_transfer_func])
+        else:
+            temp_transfer_func = None
+        # temp = np.hstack([temp_calibration, temp_transfer_func])
+        temp[calibration_mask] = temp_calibration
+        temp[~calibration_mask] = temp_transfer_func
         if mean:
             return np.nan_to_num(np.mean(temp))
         else:
