@@ -1,5 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
+import nidaqmx
 import numpy as np
 import time
 import threading
@@ -201,6 +202,7 @@ class MainWindow(ctk.CTkFrame):
         self.estimated_power = 0
         self.activation_count = 0
         self.elapsed_time = 0
+        self.iteration = 0
         self.current_acquisition_time = 0
         self.updating_gradient = False
         self.status_placement = (18, 162)
@@ -593,13 +595,19 @@ class MainWindow(ctk.CTkFrame):
         if daq_data is not None:
             daq_data = self.power_meter.update_data(daq_data)
             params = self.power_meter.get_laser_params(daq_data)
-            self.estimated_power = self.power_meter.estimate_power(daq_data[0][-1], params[0])
+            self.estimated_power = self.power_meter.estimate_power(time.time() - self.daq_reader.start_time, params[0])
             temps = self.power_meter.get_temperature_values(daq_data)
         else:
             params = self.power_meter.laser_initial_guesses
             self.estimated_power = 0
             temps = [0 for _ in range(len(self.power_meter.ports))]
         self.update_position_and_time_ui(params[1], params[2])
+        self.power_meter.update_save_cache(self.estimated_power,
+                                           self.power_meter.get_wavelength(),
+                                           (params[1], params[2]),
+                                           self.iteration,
+                                           self.daq_reader.start_time)
+        self.iteration += 1
         Z = np.flip(gaussian_2d((self.X, self.Y), *params), axis=0)
 
         # Normalize the data to fit a colormap
@@ -611,7 +619,7 @@ class MainWindow(ctk.CTkFrame):
 
     def update_gradient(self, gradient_result):
         norm, colormap, current_pos, temps, self.estimated_power = gradient_result
-        self.update_power_and_wavelength(self.estimated_power, 976)
+        self.update_power_and_wavelength(self.estimated_power, self.power_meter.get_wavelength())
 
         self.draw_overlay_shapes(norm, colormap, current_pos, temps)
 
@@ -744,8 +752,10 @@ class MainWindow(ctk.CTkFrame):
             try:
                 daq_data = self.daq_reader.fetch_daq_data()
                 self.data_queue.put(daq_data)
-            except Exception as e:
-                print(f"Error reading DAQ: {e}")
+            except Exception:
+                self.update_status_txt_box("Puissance-Mètre débranché, veuillez le rebrancher pour repartir l'acquisition")
+                self.stop_acquisition_daq()
+                threading.Thread(target=self.check_if_daq_connected).start()
         time.sleep(0.001)
 
     def load_data_loop(self):
