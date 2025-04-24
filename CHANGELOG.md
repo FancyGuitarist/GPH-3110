@@ -1,3 +1,11 @@
+## [0.12.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.12.0...v0.12.1) (2025-04-24)
+
+
+### Bug Fixes
+
+* can now unplug daq during acquisition without crashing ([7b203cf](https://github.com/FancyGuitarist/GPH-3110/commit/7b203cf9d84893979e34c1738e86388f02b1b768))
+* pre-exam setups ([da37c01](https://github.com/FancyGuitarist/GPH-3110/commit/da37c01fba62497ea75c0618bbac40b8652c5ae8))
+
 ## [0.12.0](https://github.com/FancyGuitarist/GPH-3110/compare/v0.11.0...v0.12.0) (2025-04-23)
 
 
