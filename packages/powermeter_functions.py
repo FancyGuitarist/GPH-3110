@@ -528,11 +528,11 @@ class PowerMeter:
         if wavelength <= 600:
             factor = 1/3.2
         elif 600 < wavelength <= 1300:
-            factor = 1/6
+            factor = 1/3.04
         elif 1300 < wavelength <= 2500:
-            factor = 1/10
+            factor = 1/2.64
         else:
-            factor = 1/2
+            factor = 1/3
         return factor
 
     def update_save_cache(self, power, wavelength, position, iteration, start_time):
