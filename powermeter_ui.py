@@ -1,5 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
+import nidaqmx
 import numpy as np
 import time
 import threading
@@ -751,8 +752,10 @@ class MainWindow(ctk.CTkFrame):
             try:
                 daq_data = self.daq_reader.fetch_daq_data()
                 self.data_queue.put(daq_data)
-            except Exception as e:
-                print(f"Error reading DAQ: {e}")
+            except Exception:
+                self.update_status_txt_box("Puissance-Mètre débranché, veuillez le rebrancher pour repartir l'acquisition")
+                self.stop_acquisition_daq()
+                threading.Thread(target=self.check_if_daq_connected).start()
         time.sleep(0.001)
 
     def load_data_loop(self):

@@ -80,16 +80,19 @@ class DAQReader:
             self.i = 0
 
     def fetch_daq_data(self):
-        if self.task.is_task_done():
-            self.do_task.write(self.bits_list[self.i])
+        if self.device_detected():
+            if self.task.is_task_done():
+                self.do_task.write(self.bits_list[self.i])
 
-            if self.do_task.is_task_done():
-                self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
-                averaged_data = np.abs(np.mean(self.data, axis=1))
-                current_time = time.time() - self.start_time
+                if self.do_task.is_task_done():
+                    self.reader.read_many_sample(self.data, number_of_samples_per_channel=self.samples_per_read)
+                    averaged_data = np.abs(np.mean(self.data, axis=1))
+                    current_time = time.time() - self.start_time
 
-                self.move_bit()
-        return current_time, averaged_data, self.i
+                    self.move_bit()
+            return current_time, averaged_data, self.i
+        else:
+            raise RuntimeError("PowerMeter not detected")
 
     def stop_acquisition(self):
         print("Task Closed")
