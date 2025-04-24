@@ -1,3 +1,10 @@
+## [0.12.2](https://github.com/FancyGuitarist/GPH-3110/compare/v0.12.1...v0.12.2) (2025-04-24)
+
+
+### Bug Fixes
+
+* factors ([4aba010](https://github.com/FancyGuitarist/GPH-3110/commit/4aba01004f903a7408ddb42fafdf3a0645b95f54))
+
 ## [0.12.1](https://github.com/FancyGuitarist/GPH-3110/compare/v0.12.0...v0.12.1) (2025-04-24)
 
 
