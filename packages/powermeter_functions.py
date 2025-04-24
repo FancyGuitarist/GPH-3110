@@ -323,6 +323,13 @@ class PowerMeter:
         self.factor = 1.8
         self.plate_ref_port = DAQPort("5.1")
         self.plate_ref_thermistor = Thermistor((0, 0), DAQPort("5.1"), self.calibration_arrays)
+        self.power_cache = []
+        self.power_full_cache = []
+        self.power_time_cache = []
+        self.position_cache = []
+        self.wavelength_cache = []
+        self.cached_estimated_power = 0
+        self.interval = 1
 
 
     @property
@@ -396,26 +403,45 @@ class PowerMeter:
 
 
     def reset_data(self):
-        self.time_cache = [[] for _ in range(5)]
-        self.tension_cache, self.demux_cache = [], []
+        self.tension_cache = [[] for _ in range(5)]
+        self.time_cache, self.demux_cache = [], []
+        self.power_cache = []
+        self.power_full_cache = []
+        self.power_time_cache = []
+        self.position_cache = []
+        self.wavelength_cache = []
+        self.cached_estimated_power = 0
+        self.interval = 1
         print("Data reset")
 
-    def save_current_data(self):
+    def save_current_data(self, exam_mode = True):
         save_folder_path = home_directory / "Saves"
         current_time = str(datetime.datetime.now())
         formatted_name = current_time.replace(" ", "_").replace(":", "_")[:-7]
         save_path = save_folder_path / f"QcWatt_{formatted_name}"
         save_path.mkdir(parents=True, exist_ok=True)
-        bits_array = np.array(self.demux_cache)
-        time_data_array = np.array(self.time_cache).T
-        tension_data_array = np.array(self.tension_cache).T
-        save_path_time = save_path / "time.npy"
-        save_path_tension = save_path / "tension.npy"
-        save_path_bits = save_path / "bits.npy"
-        np.save(save_path_time, time_data_array)
-        np.save(save_path_tension, tension_data_array)
-        np.save(save_path_bits, bits_array)
-        return save_path_bits
+        if exam_mode:
+            position_array = np.array(self.position_cache)
+            session_info_path = save_path / "resultats_session.csv"
+            session_dictionary = {"Temps (s)": self.power_time_cache,
+                                  "Puissance (W)": self.power_full_cache,
+                                  "Longueur d'onde (nm)": self.wavelength_cache,
+                                  "Position X (mm)": position_array[:, 0],
+                                  "Position Y (mm)": position_array[:, 1]}
+            session_dataframe = pd.DataFrame(session_dictionary)
+            session_dataframe.to_csv(session_info_path)
+            return session_info_path
+        if not exam_mode:
+            bits_array = np.array(self.demux_cache)
+            time_data_array = np.array(self.time_cache).T
+            tension_data_array = np.array(self.tension_cache).T
+            save_path_time = save_path / "time.npy"
+            save_path_tension = save_path / "tension.npy"
+            save_path_bits = save_path / "bits.npy"
+            np.save(save_path_time, time_data_array)
+            np.save(save_path_tension, tension_data_array)
+            np.save(save_path_bits, bits_array)
+            return save_path_bits
 
     def get_port_values(self, port:DAQPort, daq_data: tuple):
         time_list, tension_list, demux_list = daq_data
@@ -497,8 +523,30 @@ class PowerMeter:
             return self.laser_initial_guesses[1], self.laser_initial_guesses[2]
         return self.laser_params[1], self.laser_params[2]
 
+    def get_power_factor(self):
+        wavelength = self.get_wavelength()
+        if wavelength <= 600:
+            factor = 1/3.2
+        elif 600 < wavelength <= 1300:
+            factor = 1/6
+        elif 1300 < wavelength <= 2500:
+            factor = 1/10
+        else:
+            factor = 1/2
+        return factor
+
+    def update_save_cache(self, power, wavelength, position, iteration, start_time):
+        if start_time is not None:
+            elapsed_time = time.time() - start_time
+            if iteration % 60 == 0:
+                self.power_time_cache.append(elapsed_time)
+                self.power_full_cache.append(power)
+                self.wavelength_cache.append(wavelength)
+                self.position_cache.append(position)
+
+
     def estimate_power(self, current_time, delta_max):
-        factor = 1/3.2
+        factor = self.get_power_factor()
         factor_2 = 8
         self.delta_t_maxes_cache.append(delta_max)
         self.max_time_cache.append(current_time)
@@ -510,21 +558,22 @@ class PowerMeter:
             p_mean = np.mean(delta_t_array * factor)
             delta_p = np.diff(delta_t_array * factor)
             delta_time = np.diff(self.max_time_cache)
-            # print("Current time array: ", self.max_time_cache)
-            # print("time_array len: ", len(self.max_time_cache))
-            # print("Current delta time array: ", delta_time)
-            # print("delta time shape: ", delta_time.shape)
             p_est = np.mean(delta_p/delta_time) * factor_2 + p_mean
             if p_est < 0.06:
                 p_est = 0
         else:
             p_est = 0
             print("Insufficient data to estimate power, returning 0W")
-        # print("Current estimated power:", p_est)
-        return np.round(p_est, 2)
-
-    def estimate_absorbance_of_glass(self, temps: list, glass_type: Glass):
-        pass
+        self.power_cache.append(p_est)
+        print("Current power cache length: ", len(self.power_cache))
+        print("Current cached power: ", self.cached_estimated_power)
+        if len(self.power_cache) >= 100:
+            estimated_power = np.mean(self.power_cache)
+            self.cached_estimated_power = estimated_power
+            self.power_cache = self.power_cache[50:]
+        else:
+            estimated_power = self.cached_estimated_power
+        return np.round(estimated_power, 2)
 
     def estimate_wavelength(self):
         return 976  # For now, will implement actual function later
